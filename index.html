@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://via.placeholder.com/192"> <title>IUI Tracker</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; background-color: #f2f2f7; margin: 0; }
+    h2 { font-size: 24px; color: #1c1c1e; }
+    .cycle-card { background: white; padding: 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .btn { background-color: #007AFF; color: white; border: none; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; margin-bottom: 24px; cursor: pointer; }
+    .btn:disabled { background-color: #a1c6ea; }
+    .status-badge { display: inline-block; padding: 4px 8px; border-radius: 8px; background-color: #e5f1ff; color: #007AFF; font-size: 12px; margin-top: 8px;}
+  </style>
+</head>
+<body>
+  <h2>IUI Tracker</h2>
+  <button class="btn" onclick="addCycle()">＋ 新規周期を開始</button>
+  <div id="cycle-list">読込中...</div>
+
+  <script>
+    // ★ステップ2で取得したGASのウェブアプリURLに置き換えてください
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwFIZh4BD1FK6wwTsFbAIK6Cmh9P31YUwc2QDco2_EbsrtGeAE2t62n75JUoY3lSV9onA/exec';
+
+    async function fetchCycles() {
+      try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+        const list = document.getElementById('cycle-list');
+        list.innerHTML = '';
+        
+        if(data.length === 0) {
+          list.innerHTML = '<p>データがありません</p>';
+          return;
+        }
+
+        // 最新の周期を上に表示
+        data.reverse().forEach(cycle => {
+          const dateStr = new Date(cycle.start_date).toLocaleDateString('ja-JP');
+          list.innerHTML += `
+            <div class="cycle-card">
+              <div style="font-size: 14px; color: #8e8e93;">開始日: ${dateStr}</div>
+              <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">種別: ${cycle.type}</div>
+              <div class="status-badge">${cycle.status}</div>
+            </div>
+          `;
+        });
+      } catch (error) {
+        document.getElementById('cycle-list').innerText = '通信エラーが発生しました';
+      }
+    }
+
+    async function addCycle() {
+      const btn = document.querySelector('.btn');
+      btn.disabled = true;
+      btn.innerText = '保存中...';
+
+      const payload = {
+        start_date: new Date().toISOString(),
+        type: '自然',
+        status: '生理中'
+      };
+
+      try {
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain', // 必須: CORSプリフライト回避
+          },
+          body: JSON.stringify(payload)
+        });
+        await fetchCycles(); // 保存後に再読込
+      } catch (error) {
+        alert('保存に失敗しました');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '＋ 新規周期を開始';
+      }
+    }
+
+    // 初回読込実行
+    fetchCycles();
+  </script>
+</body>
+</html>
