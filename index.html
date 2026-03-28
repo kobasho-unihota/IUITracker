@@ -190,7 +190,6 @@
 
   <div id="loading">同期中...</div>
 
-  <!-- View 1: Home Dashboard -->
   <div id="view-home" class="view-container">
     <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 4px;" id="header-date"></div>
     <div class="page-header">
@@ -198,7 +197,6 @@
       <div class="header-icon">🌸</div>
     </div>
     
-    <!-- Dashboard Card -->
     <div class="card">
       <div class="badge-wrap">
         <div id="badge-status" class="badge">ステータス取得中</div>
@@ -229,8 +227,7 @@
     
     <div class="section-title">サポートタスク</div>
     <div class="task-list" id="task-list">
-      <!-- Tasks rendered here -->
-    </div>
+      </div>
     
     <div class="section-title">クイック記録</div>
     <div class="quick-grid">
@@ -257,11 +254,10 @@
     </div>
   </div>
 
-  <!-- View 2: Calendar -->
   <div id="view-calendar" class="view-container hidden">
     <div class="cal-header">
       <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
-      <div id="cal-month-title">2026年3月</div>
+      <div id="cal-month-title"></div>
       <button class="cal-nav" onclick="changeMonth(1)">›</button>
     </div>
     
@@ -270,18 +266,15 @@
       <div class="cal-day-header">水</div><div class="cal-day-header">木</div><div class="cal-day-header">金</div><div class="cal-day-header">土</div>
     </div>
     <div id="cal-days-grid" class="cal-grid">
-      <!-- Calendar cells injected here -->
-    </div>
+      </div>
     
     <div class="cal-detail">
       <div id="cal-selected-date" style="font-size: 14px; color: var(--text-sub); margin-bottom: 24px; text-align: left;"></div>
       <div id="cal-record-content">
-        <!-- Records info injected here -->
-      </div>
+        </div>
     </div>
   </div>
 
-  <!-- View 3: Records Menu -->
   <div id="view-records" class="view-container hidden">
     <div class="page-header">
       <div class="page-title">記録</div>
@@ -335,7 +328,6 @@
     </div>
   </div>
 
-  <!-- View 4: Cycles -->
   <div id="view-cycles" class="view-container hidden">
     <div class="page-header">
       <div class="page-title">周期一覧</div>
@@ -343,11 +335,9 @@
     </div>
     
     <div id="cycles-list" class="menu-list">
-      <!-- Cycles injected here -->
-    </div>
+      </div>
   </div>
 
-  <!-- View 5: Settings -->
   <div id="view-settings" class="view-container hidden">
     <div class="page-header">
       <div class="page-title">設定</div>
@@ -380,9 +370,6 @@
     <div style="text-align:center; font-size:9px; color:#E5E5EA; margin-top:40px;">Developed for Shogo & 🐈 Hotate, Uni</div>
   </div>
 
-  <!-- SUB VIEWS (Forms) -->
-  
-  <!-- Daily Form -->
   <div id="view-form-daily" class="view-container hidden">
     <div class="sub-header">
       <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
@@ -419,7 +406,6 @@
     </div>
   </div>
 
-  <!-- Clinic Form -->
   <div id="view-form-clinic" class="view-container hidden">
     <div class="sub-header">
       <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
@@ -442,7 +428,6 @@
     </div>
   </div>
 
-  <!-- IUI Form -->
   <div id="view-form-iui" class="view-container hidden">
     <div class="sub-header">
       <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
@@ -457,7 +442,6 @@
     </div>
   </div>
   
-  <!-- Meds Form Placeholder -->
   <div id="view-form-meds" class="view-container hidden">
     <div class="sub-header">
       <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
@@ -466,7 +450,6 @@
     <div class="card"><div style="text-align:center; color:var(--text-sub); padding:20px;">機能準備中</div></div>
   </div>
 
-  <!-- New Cycle Form -->
   <div id="view-form-new-cycle" class="view-container hidden">
     <div class="sub-header">
       <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
@@ -487,7 +470,6 @@
     </div>
   </div>
 
-  <!-- Bottom Navigation -->
   <nav class="bottom-nav">
     <div class="nav-item active" onclick="switchNav('home', this)">
       <div class="nav-icon">🏠</div>ホーム
@@ -507,7 +489,6 @@
   </nav>
 
   <script>
-    // ★ご自身のGAS URLに書き換えてください
     const API_URL = 'https://script.google.com/macros/s/AKfycbzYUDdWhVV1Qdple0XVik9WGRvga09LOafhQ1z2Mt6sDx-Ln66cdsU_pn94cTp0awsCQQ/exec';
     
     const state = {
@@ -515,8 +496,20 @@
       predictions: {}, currentCalMonth: new Date()
     };
     
-    // YYYY-MM-DD
-    function getTodayStr() { return new Date().toLocaleDateString('sv-SE'); }
+    // 【修正箇所】タイムゾーンのズレを防ぐため、Dateオブジェクトからローカル時間のYYYY-MM-DDを生成する関数
+    function toLocalYYYYMMDD(dateInput) {
+      if (!dateInput) return '';
+      const d = new Date(dateInput);
+      if (isNaN(d)) return '';
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function getTodayStr() { 
+      return toLocalYYYYMMDD(new Date()); 
+    }
 
     async function init() {
       // Set Date Headers
@@ -592,7 +585,8 @@
       
       // 今日のタスク判定 (未入力なら促す)
       const todayStr = getTodayStr();
-      const todayRecord = state.daily.find(d => d.date.startsWith(todayStr));
+      // 【修正箇所】toLocalYYYYMMDD を使ってローカル時間の日付文字列で比較
+      const todayRecord = state.daily.find(d => d.date && toLocalYYYYMMDD(d.date) === todayStr);
       if(!todayRecord || !todayRecord.temperature) {
         actionList.unshift(`🌡 <b>本日</b> : 基礎体温の記録を確認`);
       }
@@ -674,14 +668,15 @@
       
       const todayStr = getTodayStr();
       
-      // Create a Set of dates that have records
+      // 【修正箇所】記録の抽出時にローカル時間の文字列でSetを作成する
       const recordDates = new Set();
-      state.daily.forEach(d => recordDates.add(d.date.split('T')[0]));
-      state.clinic.forEach(c => recordDates.add(c.visit_date.split('T')[0]));
+      state.daily.forEach(d => { if(d.date) recordDates.add(toLocalYYYYMMDD(d.date)); });
+      state.clinic.forEach(c => { if(c.visit_date) recordDates.add(toLocalYYYYMMDD(c.visit_date)); });
       
       for(let i=1; i<=totalDays; i++) {
         const cellDate = new Date(year, month, i);
-        const dateStr = cellDate.toLocaleDateString('sv-SE');
+        // 【修正箇所】カレンダーセルの日付もローカル時間文字列で生成
+        const dateStr = toLocalYYYYMMDD(cellDate);
         const isToday = dateStr === todayStr;
         const hasRecord = recordDates.has(dateStr);
         
@@ -710,9 +705,9 @@
       const days = ['日', '月', '火', '水', '木', '金', '土'];
       document.getElementById('cal-selected-date').innerText = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
       
-      // Find records
-      const dailyRecord = state.daily.find(r => r.date.startsWith(dateStr));
-      const clinicRecord = state.clinic.find(r => r.visit_date.startsWith(dateStr));
+      // 【修正箇所】ローカル時間の文字列でレコードを検索
+      const dailyRecord = state.daily.find(r => r.date && toLocalYYYYMMDD(r.date) === dateStr);
+      const clinicRecord = state.clinic.find(r => r.visit_date && toLocalYYYYMMDD(r.visit_date) === dateStr);
       
       let detailHtml = '';
       if(!dailyRecord && !clinicRecord) {
