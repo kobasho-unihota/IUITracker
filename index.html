@@ -5,83 +5,173 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="https://via.placeholder.com/192"> <title>IUI Tracker</title>
+  <title>IUI Tracker</title>
+  
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; background-color: #f2f2f7; margin: 0; }
-    h2 { font-size: 24px; color: #1c1c1e; }
-    .cycle-card { background: white; padding: 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .btn { background-color: #007AFF; color: white; border: none; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; margin-bottom: 24px; cursor: pointer; }
-    .btn:disabled { background-color: #a1c6ea; }
-    .status-badge { display: inline-block; padding: 4px 8px; border-radius: 8px; background-color: #e5f1ff; color: #007AFF; font-size: 12px; margin-top: 8px;}
+    /* ベース設定 */
+    :root { --primary: #007AFF; --bg: #f2f2f7; --card-bg: #ffffff; --text: #1c1c1e; --text-sub: #8e8e93; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; background-color: var(--bg); color: var(--text); margin: 0; }
+    h2, h3 { margin-top: 0; margin-bottom: 12px; }
+    
+    /* カードコンポーネント */
+    .card { background: var(--card-bg); padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    
+    /* フォーム要素 */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 14px; margin-bottom: 4px; color: var(--text-sub); }
+    .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+    .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    
+    /* ボタン */
+    .btn { background-color: var(--primary); color: white; border: none; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; text-align: center; }
+    .btn:disabled { opacity: 0.6; }
+    .btn-secondary { background-color: #e5e5ea; color: var(--text); margin-bottom: 16px;}
+    
+    /* ステータスバッジ */
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 8px; background-color: #e5f1ff; color: var(--primary); font-size: 12px; font-weight: bold; }
+    
+    /* ユーティリティ */
+    .hidden { display: none; }
   </style>
 </head>
 <body>
+
   <h2>IUI Tracker</h2>
-  <button class="btn" onclick="addCycle()">＋ 新規周期を開始</button>
-  <div id="cycle-list">読込中...</div>
+
+  <div id="active-cycle-area" class="card hidden">
+    <h3>現在の周期</h3>
+    <div id="active-cycle-info" style="margin-bottom: 12px;"></div>
+    
+    <div style="border-top: 1px solid #eee; padding-top: 12px;">
+      <h3>📝 今日の記録</h3>
+      <div class="form-group">
+        <label>基礎体温 (°C)</label>
+        <input type="number" id="input-temp" class="form-control" step="0.01" placeholder="例: 36.55">
+      </div>
+      <div class="form-group">
+        <label>LH検査薬</label>
+        <select id="input-lh" class="form-control">
+          <option value="未実施">未実施</option>
+          <option value="陰性">陰性</option>
+          <option value="薄陽性">薄陽性</option>
+          <option value="陽性">陽性</option>
+          <option value="強陽性">強陽性</option>
+        </select>
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="input-timing"> <label for="input-timing" style="margin:0;">タイミング実施</label>
+      </div>
+      <div class="checkbox-group">
+        <input type="checkbox" id="input-abstinence"> <label for="input-abstinence" style="margin:0;">禁欲中</label>
+      </div>
+      <div class="form-group">
+        <label>体調・メモ</label>
+        <input type="text" id="input-condition" class="form-control" placeholder="おりもの状態や特記事項">
+      </div>
+      <button id="btn-save-daily" class="btn" onclick="saveDailyRecord()">記録を保存</button>
+    </div>
+  </div>
+
+  <button class="btn btn-secondary" onclick="addCycle()">＋ 新規周期を開始</button>
+
+  <h3>最近の記録</h3>
+  <div id="records-list"></div>
 
   <script>
-    // ★ステップ2で取得したGASのウェブアプリURLに置き換えてください
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwFIZh4BD1FK6wwTsFbAIK6Cmh9P31YUwc2QDco2_EbsrtGeAE2t62n75JUoY3lSV9onA/exec';
+    // ★ご自身のGAS URLに書き換えてください
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwXpDBOM-q7XnhFMjsaE8RXHloTbpXk-A6QNOjredv2Nb0grVmmwbFf8ddnD8DHiGbz8A/exec';
+    let currentCycleId = null;
 
-    async function fetchCycles() {
+    // 初期化ロード
+    async function loadData() {
       try {
-        const response = await fetch(API_URL);
-        const data = await response.json();
-        const list = document.getElementById('cycle-list');
-        list.innerHTML = '';
+        // 周期データの取得
+        const cycleRes = await fetch(API_URL + '?table=cycles');
+        const cycles = await cycleRes.json();
         
-        if(data.length === 0) {
-          list.innerHTML = '<p>データがありません</p>';
-          return;
-        }
-
-        // 最新の周期を上に表示
-        data.reverse().forEach(cycle => {
-          const dateStr = new Date(cycle.start_date).toLocaleDateString('ja-JP');
-          list.innerHTML += `
-            <div class="cycle-card">
-              <div style="font-size: 14px; color: #8e8e93;">開始日: ${dateStr}</div>
-              <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">種別: ${cycle.type}</div>
-              <div class="status-badge">${cycle.status}</div>
-            </div>
+        if (cycles.length > 0) {
+          // 最新の周期をアクティブ周期とする
+          const activeCycle = cycles[cycles.length - 1];
+          currentCycleId = activeCycle.id;
+          document.getElementById('active-cycle-area').classList.remove('hidden');
+          document.getElementById('active-cycle-info').innerHTML = `
+            <div>開始日: ${new Date(activeCycle.start_date).toLocaleDateString('ja-JP')}</div>
+            <div class="badge">${activeCycle.status}</div>
           `;
-        });
+          
+          // アクティブ周期に紐づく日次記録の取得
+          const dailyRes = await fetch(API_URL + '?table=daily_records');
+          const dailyRecords = await dailyRes.json();
+          const currentDaily = dailyRecords.filter(r => r.cycle_id === currentCycleId).reverse();
+          
+          const listUI = document.getElementById('records-list');
+          listUI.innerHTML = '';
+          currentDaily.forEach(record => {
+            listUI.innerHTML += `
+              <div class="card">
+                <div style="font-weight:bold;">${new Date(record.date).toLocaleDateString('ja-JP')}</div>
+                <div>体温: ${record.temperature ? record.temperature + '°C' : '-'}</div>
+                <div>LH: ${record.lh_result} / タイミング: ${record.timing ? '済' : '-'}</div>
+                <div style="font-size:12px; color:#8e8e93; margin-top:4px;">${record.condition || ''}</div>
+              </div>
+            `;
+          });
+        }
       } catch (error) {
-        document.getElementById('cycle-list').innerText = '通信エラーが発生しました';
+        alert('データ読み込みエラー');
       }
     }
 
+    // 新規周期の開始（POST）
     async function addCycle() {
-      const btn = document.querySelector('.btn');
-      btn.disabled = true;
-      btn.innerText = '保存中...';
+      const payload = { table: 'cycles', start_date: new Date().toISOString(), type: '自然', status: '生理中' };
+      await postData(payload);
+      loadData();
+    }
+
+    // 日次記録の保存（POST）
+    async function saveDailyRecord() {
+      if (!currentCycleId) return alert('周期が開始されていません');
+      const btn = document.getElementById('btn-save-daily');
+      btn.disabled = true; btn.innerText = '保存中...';
 
       const payload = {
-        start_date: new Date().toISOString(),
-        type: '自然',
-        status: '生理中'
+        table: 'daily_records',
+        cycle_id: currentCycleId,
+        date: new Date().toISOString(),
+        temperature: document.getElementById('input-temp').value,
+        lh_result: document.getElementById('input-lh').value,
+        timing: document.getElementById('input-timing').checked,
+        abstinence: document.getElementById('input-abstinence').checked,
+        condition: document.getElementById('input-condition').value
       };
 
+      await postData(payload);
+      
+      // フォームリセット
+      document.getElementById('input-temp').value = '';
+      document.getElementById('input-condition').value = '';
+      document.getElementById('input-timing').checked = false;
+      
+      btn.disabled = false; btn.innerText = '記録を保存';
+      loadData();
+    }
+
+    // 共通POST関数
+    async function postData(payload) {
       try {
         await fetch(API_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain', // 必須: CORSプリフライト回避
-          },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(payload)
         });
-        await fetchCycles(); // 保存後に再読込
       } catch (error) {
         alert('保存に失敗しました');
-      } finally {
-        btn.disabled = false;
-        btn.innerText = '＋ 新規周期を開始';
       }
     }
 
-    // 初回読込実行
-    fetchCycles();
+    // 起動時にデータ読み込み
+    loadData();
   </script>
 </body>
 </html>
