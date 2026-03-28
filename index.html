@@ -116,20 +116,13 @@
       text-align: center; color: #8A6565; font-size: 13px; font-style: italic;
     }
     
-    /* List Menu (Records, Cycles) */
+    /* List Menu */
     .menu-list { display: flex; flex-direction: column; gap: 12px; }
     .menu-item {
       background: var(--card-bg); border-radius: 16px; padding: 16px;
       display: flex; align-items: center; justify-content: space-between;
       box-shadow: 0 2px 8px rgba(0,0,0,0.02); cursor: pointer;
     }
-    .menu-content { display: flex; align-items: center; gap: 16px; }
-    .menu-icon-circle { 
-      width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light);
-      display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--primary);
-    }
-    .menu-text-main { font-size: 16px; font-weight: 500; margin-bottom: 2px; }
-    .menu-text-sub { font-size: 12px; color: var(--text-sub); }
     
     /* Forms */
     .form-group { margin-bottom: 16px; width: 100%; }
@@ -139,8 +132,6 @@
       border-radius: 12px; font-size: 16px; background-color: var(--card-bg); 
       -webkit-appearance: none; margin: 0; display: block;
     }
-    .form-row { display: flex; gap: 12px; width: 100%; }
-    .form-col { flex: 1; min-width: 0; }
     
     /* Action Button */
     .btn-main { 
@@ -148,41 +139,24 @@
       padding: 16px; border-radius: 16px; font-size: 16px; font-weight: 600; 
       width: 100%; cursor: pointer; text-align: center; margin-top: 12px;
     }
-    .btn-main:disabled { opacity: 0.6; }
     
     /* Calendar */
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 18px; font-weight: 600;}
     .cal-nav { background: none; border: none; font-size: 18px; cursor: pointer; padding: 8px;}
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-    .cal-day-header { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
-    .cal-day-header:first-child { color: #FF3B30; }
-    .cal-day-header:last-child { color: #007AFF; }
-    .cal-cell { 
-      aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; 
-      font-size: 16px; border-radius: 50%; cursor: pointer; position: relative;
-    }
+    .cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 16px; border-radius: 50%; cursor: pointer; position: relative; }
     .cal-cell.empty { visibility: hidden; }
     .cal-cell.selected { background-color: var(--primary); color: white; }
-    .cal-cell.today { font-weight: bold; }
+    .cal-cell.today { font-weight: bold; border: 1px solid var(--primary); }
     .cal-dot { width: 4px; height: 4px; background-color: var(--primary); border-radius: 50%; position: absolute; bottom: 4px; }
     .cal-cell.selected .cal-dot { background-color: white; }
     
-    .cal-detail { margin-top: 24px; text-align: center; }
-    .cal-detail-empty { color: var(--text-sub); font-size: 14px; margin-bottom: 16px; }
-    .btn-outline { background: transparent; border: 1px solid var(--border); border-radius: 20px; padding: 8px 24px; font-size: 14px; color: var(--text-main); }
-    
     /* Bottom Navigation */
-    .bottom-nav { 
-      position: fixed; bottom: 0; left: 0; right: 0; 
-      background: rgba(253, 251, 251, 0.9); backdrop-filter: blur(10px); 
-      border-top: 1px solid var(--border); display: flex; justify-content: space-around; 
-      padding: 10px 0 calc(env(safe-area-inset-bottom, 20px) + 10px) 0; z-index: 100;
-    }
-    .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-sub); font-size: 10px; cursor: pointer; flex: 1; }
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(253, 251, 251, 0.9); backdrop-filter: blur(10px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0 calc(env(safe-area-inset-bottom, 20px) + 10px) 0; z-index: 100; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-sub); font-size: 10px; flex: 1; }
     .nav-item.active { color: var(--primary); }
     .nav-icon { font-size: 22px; margin-bottom: 4px; }
     
-    /* Loading overlay */
     #loading { position: fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.8); z-index:999; display:flex; align-items:center; justify-content:center; color: var(--primary); font-weight:bold; }
   </style>
 </head>
@@ -192,465 +166,104 @@
 
   <div id="view-home" class="view-container">
     <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 4px;" id="header-date"></div>
-    <div class="page-header">
-      <div class="page-title">IUIスケジュール</div>
-      <div class="header-icon">🌸</div>
-    </div>
-    
+    <div class="page-header"><div class="page-title">IUIスケジュール</div><div class="header-icon">🌸</div></div>
     <div class="card">
-      <div class="badge-wrap">
-        <div id="badge-status" class="badge">ステータス取得中</div>
-        <div id="badge-day" class="cycle-day-text">周期 - 日目</div>
-      </div>
-      
+      <div class="badge-wrap"><div id="badge-status" class="badge">-</div><div id="badge-day" class="cycle-day-text">-</div></div>
       <div class="dash-grid">
-        <div class="dash-item">
-          <div class="dash-label">排卵見込み</div>
-          <div id="dash-ovu-val" class="dash-val">-</div>
-          <div class="dash-sub">医師/予測値</div>
-        </div>
-        <div class="dash-item">
-          <div class="dash-label">次回生理予定</div>
-          <div id="dash-period-val" class="dash-val">-</div>
-          <div class="dash-sub">±3日</div>
-        </div>
-        <div class="dash-item">
-          <div class="dash-label">IUI実施日(予定)</div>
-          <div id="dash-iui-val" class="dash-val">-</div>
-        </div>
-        <div class="dash-item">
-          <div class="dash-label">禁欲開始日</div>
-          <div id="dash-abstinence-val" class="dash-val">-</div>
-        </div>
+        <div class="dash-item"><div class="dash-label">排卵見込み</div><div id="dash-ovu-val" class="dash-val">-</div></div>
+        <div class="dash-item"><div class="dash-label">次回生理予定</div><div id="dash-period-val" class="dash-val">-</div></div>
+        <div class="dash-item"><div class="dash-label">IUI実施日</div><div id="dash-iui-val" class="dash-val">-</div></div>
+        <div class="dash-item"><div class="dash-label">禁欲開始日</div><div id="dash-abstinence-val" class="dash-val">-</div></div>
       </div>
     </div>
-    
     <div class="section-title">サポートタスク</div>
-    <div class="task-list" id="task-list">
-      </div>
-    
+    <div class="task-list" id="task-list"></div>
     <div class="section-title">クイック記録</div>
     <div class="quick-grid">
-      <button class="quick-btn" onclick="openForm('daily')">
-        <div class="quick-icon-wrap"><span class="quick-icon" style="color:#FFB6C1;">🌡</span>基礎体温</div>
-        <span class="quick-arrow">›</span>
-      </button>
-      <button class="quick-btn" onclick="openForm('clinic')">
-        <div class="quick-icon-wrap"><span class="quick-icon" style="color:#A7D7C5;">🩺</span>通院記録</div>
-        <span class="quick-arrow">›</span>
-      </button>
-      <button class="quick-btn" onclick="openForm('meds')">
-        <div class="quick-icon-wrap"><span class="quick-icon" style="color:#C3B1E1;">💊</span>薬・注射</div>
-        <span class="quick-arrow">›</span>
-      </button>
-      <button class="quick-btn" onclick="openForm('iui')">
-        <div class="quick-icon-wrap"><span class="quick-icon" style="color:#F4A4A4;">♡</span>IUI管理</div>
-        <span class="quick-arrow">›</span>
-      </button>
-    </div>
-    
-    <div class="footer-msg">
-      妻のサポート、今日もお疲れ様です。
+      <button class="quick-btn" onclick="openForm('daily')">🌡 基礎体温 <span>›</span></button>
+      <button class="quick-btn" onclick="openForm('clinic')">🩺 通院記録 <span>›</span></button>
+      <button class="quick-btn" onclick="openForm('meds')">💊 薬・注射 <span>›</span></button>
+      <button class="quick-btn" onclick="openForm('iui')">♡ IUI管理 <span>›</span></button>
     </div>
   </div>
 
   <div id="view-calendar" class="view-container hidden">
-    <div class="cal-header">
-      <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
-      <div id="cal-month-title"></div>
-      <button class="cal-nav" onclick="changeMonth(1)">›</button>
-    </div>
-    
-    <div class="cal-grid">
-      <div class="cal-day-header">日</div><div class="cal-day-header">月</div><div class="cal-day-header">火</div>
-      <div class="cal-day-header">水</div><div class="cal-day-header">木</div><div class="cal-day-header">金</div><div class="cal-day-header">土</div>
-    </div>
-    <div id="cal-days-grid" class="cal-grid">
-      </div>
-    
-    <div class="cal-detail">
-      <div id="cal-selected-date" style="font-size: 14px; color: var(--text-sub); margin-bottom: 24px; text-align: left;"></div>
-      <div id="cal-record-content">
-        </div>
-    </div>
+    <div class="cal-header"><button class="cal-nav" onclick="changeMonth(-1)">‹</button><div id="cal-month-title"></div><button class="cal-nav" onclick="changeMonth(1)">›</button></div>
+    <div class="cal-grid" id="cal-days-grid"></div>
+    <div class="cal-detail"><div id="cal-selected-date" style="text-align:left; font-size:14px; color:var(--text-sub); margin:20px 0;"></div><div id="cal-record-content"></div></div>
   </div>
 
-  <div id="view-records" class="view-container hidden">
-    <div class="page-header">
-      <div class="page-title">記録</div>
-    </div>
-    <div style="font-size: 14px; color: var(--text-sub); margin-bottom: 24px;">妻の状況や日々の記録を管理します</div>
-    
-    <div class="menu-list">
-      <div class="menu-item" onclick="openForm('daily')">
-        <div class="menu-content">
-          <div class="menu-icon-circle" style="color:#FFB6C1; background:#FFF0F2;">🌡</div>
-          <div>
-            <div class="menu-text-main">日次記録</div>
-            <div class="menu-text-sub">基礎体温・LH検査・タイミング</div>
-          </div>
-        </div>
-        <span class="quick-arrow">›</span>
-      </div>
-      
-      <div class="menu-item" onclick="openForm('clinic')">
-        <div class="menu-content">
-          <div class="menu-icon-circle" style="color:#A7D7C5; background:#EEF7F4;">🩺</div>
-          <div>
-            <div class="menu-text-main">通院記録</div>
-            <div class="menu-text-sub">受診日・次回指示・医師コメント</div>
-          </div>
-        </div>
-        <span class="quick-arrow">›</span>
-      </div>
-      
-      <div class="menu-item" onclick="openForm('meds')">
-        <div class="menu-content">
-          <div class="menu-icon-circle" style="color:#C3B1E1; background:#F4F0FA;">💊</div>
-          <div>
-            <div class="menu-text-main">薬・注射</div>
-            <div class="menu-text-sub">服薬・注射の記録</div>
-          </div>
-        </div>
-        <span class="quick-arrow">›</span>
-      </div>
-      
-      <div class="menu-item" onclick="openForm('iui')">
-        <div class="menu-content">
-          <div class="menu-icon-circle" style="color:#F4A4A4; background:#FDEDED;">♡</div>
-          <div>
-            <div class="menu-text-main">IUI管理</div>
-            <div class="menu-text-sub">人工授精の予定・実施記録</div>
-          </div>
-        </div>
-        <span class="quick-arrow">›</span>
-      </div>
-    </div>
-  </div>
+  <div id="view-records" class="view-container hidden"><h2>記録</h2><div id="full-records-list"></div></div>
+  <div id="view-cycles" class="view-container hidden"><h2>周期一覧</h2><div id="cycles-list"></div></div>
+  <div id="view-settings" class="view-container hidden"><h2>設定</h2><p>Developed for Shogo & 🐈 Hotate, Uni</p></div>
 
-  <div id="view-cycles" class="view-container hidden">
-    <div class="page-header">
-      <div class="page-title">周期一覧</div>
-      <button class="btn-outline" style="border:none; background:var(--primary); color:white; border-radius:12px; padding:6px 16px;" onclick="openForm('new-cycle')">＋ 新規</button>
-    </div>
-    
-    <div id="cycles-list" class="menu-list">
-      </div>
-  </div>
-
-  <div id="view-settings" class="view-container hidden">
-    <div class="page-header">
-      <div class="page-title">設定</div>
-    </div>
-    <div style="font-size: 14px; color: var(--text-sub); margin-bottom: 24px;">アプリの動作をカスタマイズ</div>
-    
-    <div class="section-title">周期設定</div>
-    <div class="card" style="margin-bottom: 24px;">
-      <div class="form-group">
-        <label>平均周期日数</label>
-        <select class="form-control" id="set-cycle-len"><option value="28">28日</option><option value="31" selected>31日</option><option value="35">35日</option></select>
-      </div>
-      <div class="form-group">
-        <label>生理予定日の誤差範囲</label>
-        <select class="form-control" id="set-error"><option value="3">±3日</option></select>
-      </div>
-      <div class="form-group" style="margin-bottom: 0;">
-        <label>禁欲推奨日数</label>
-        <select class="form-control" id="set-abstinence"><option value="1">1日</option><option value="2" selected>2日</option></select>
-      </div>
-    </div>
-    
-    <div class="section-title">データ連携</div>
-    <div class="card">
-      <div style="font-size: 13px; color: var(--text-sub); line-height: 1.5;">
-        データは連携されたGoogle SpreadSheetに安全に保存されています。<br>
-        ※夫側からの確認用として、妻の入力内容を同期表示します。
-      </div>
-    </div>
-    <div style="text-align:center; font-size:9px; color:#E5E5EA; margin-top:40px;">Developed for Shogo & 🐈 Hotate, Uni</div>
-  </div>
-
-  <div id="view-form-daily" class="view-container hidden">
-    <div class="sub-header">
-      <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-      <div class="page-title" style="font-size: 18px;">日次記録</div>
-    </div>
-    <div class="card">
-      <div class="form-group">
-        <label>日付</label>
-        <input type="date" id="daily-date" class="form-control">
-      </div>
-      <div class="form-row">
-        <div class="form-col">
-          <label>基礎体温 (°C)</label>
-          <input type="number" id="daily-temp" class="form-control" step="0.01">
-        </div>
-        <div class="form-col">
-          <label>LH検査薬</label>
-          <select id="daily-lh" class="form-control">
-            <option value="未実施">未実施</option><option value="陰性">陰性</option><option value="薄陽性">薄陽性</option><option value="陽性">陽性</option><option value="強陽性">強陽性</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group" style="margin-top: 16px;">
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 15px;">
-          <input type="checkbox" id="daily-timing" style="width:20px; height:20px; accent-color:var(--primary);"> タイミングをとった
-        </label>
-      </div>
-      <div class="form-group">
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 15px;">
-          <input type="checkbox" id="daily-abstinence" style="width:20px; height:20px; accent-color:var(--primary);"> 禁欲中である
-        </label>
-      </div>
-      <button class="btn-main" onclick="saveRecord('daily')">保存する</button>
-    </div>
-  </div>
-
-  <div id="view-form-clinic" class="view-container hidden">
-    <div class="sub-header">
-      <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-      <div class="page-title" style="font-size: 18px;">通院記録</div>
-    </div>
-    <div class="card">
-      <div class="form-group">
-        <label>受診日</label>
-        <input type="date" id="clinic-date" class="form-control">
-      </div>
-      <div class="form-group">
-        <label>医師による排卵見込み日</label>
-        <input type="date" id="clinic-predict" class="form-control">
-      </div>
-      <div class="form-group">
-        <label>次回受診の指示日</label>
-        <input type="date" id="clinic-next" class="form-control">
-      </div>
-      <button class="btn-main" onclick="saveRecord('clinic')">保存する</button>
-    </div>
-  </div>
-
-  <div id="view-form-iui" class="view-container hidden">
-    <div class="sub-header">
-      <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-      <div class="page-title" style="font-size: 18px;">IUI管理</div>
-    </div>
-    <div class="card">
-      <div class="form-group">
-        <label>人工授精(IUI) 予定日</label>
-        <input type="date" id="iui-planned" class="form-control">
-      </div>
-      <button class="btn-main" onclick="saveRecord('iui')">保存する</button>
-    </div>
-  </div>
-  
-  <div id="view-form-meds" class="view-container hidden">
-    <div class="sub-header">
-      <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-      <div class="page-title" style="font-size: 18px;">薬・注射</div>
-    </div>
-    <div class="card"><div style="text-align:center; color:var(--text-sub); padding:20px;">機能準備中</div></div>
-  </div>
-
-  <div id="view-form-new-cycle" class="view-container hidden">
-    <div class="sub-header">
-      <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-      <div class="page-title" style="font-size: 18px;">新規周期の登録</div>
-    </div>
-    <div class="card">
-      <div class="form-group">
-        <label>生理開始日</label>
-        <input type="date" id="new-cycle-date" class="form-control">
-      </div>
-      <div class="form-group">
-        <label>周期タイプ</label>
-        <select id="new-cycle-type" class="form-control">
-          <option value="人工授精周期">人工授精周期</option><option value="排卵誘発周期">排卵誘発周期</option><option value="自然周期">自然周期</option>
-        </select>
-      </div>
-      <button class="btn-main" onclick="startNewCycle()">周期を開始する</button>
-    </div>
-  </div>
+  <div id="view-form-daily" class="view-container hidden"><div class="back-btn" onclick="closeForm()">‹ 戻る</div><div class="card"><h3>日次記録</h3><input type="date" id="daily-date" class="form-control"><input type="number" id="daily-temp" class="form-control" step="0.01" placeholder="体温"><select id="daily-lh" class="form-control"><option value="未実施">LH未実施</option><option value="陰性">陰性</option><option value="陽性">陽性</option></select><button class="btn-main" onclick="saveRecord('daily')">保存</button></div></div>
+  <div id="view-form-clinic" class="view-container hidden"><div class="back-btn" onclick="closeForm()">‹ 戻る</div><div class="card"><h3>通院記録</h3><input type="date" id="clinic-date" class="form-control"><label>排卵予測</label><input type="date" id="clinic-predict" class="form-control"><label>次回受診</label><input type="date" id="clinic-next" class="form-control"><button class="btn-main" onclick="saveRecord('clinic')">保存</button></div></div>
+  <div id="view-form-iui" class="view-container hidden"><div class="back-btn" onclick="closeForm()">‹ 戻る</div><div class="card"><h3>IUI予定</h3><input type="date" id="iui-planned" class="form-control"><button class="btn-main" onclick="saveRecord('iui')">保存</button></div></div>
 
   <nav class="bottom-nav">
-    <div class="nav-item active" onclick="switchNav('home', this)">
-      <div class="nav-icon">🏠</div>ホーム
-    </div>
-    <div class="nav-item" onclick="switchNav('calendar', this)">
-      <div class="nav-icon">📅</div>カレンダー
-    </div>
-    <div class="nav-item" onclick="switchNav('records', this)">
-      <div class="nav-icon">✏️</div>記録
-    </div>
-    <div class="nav-item" onclick="switchNav('cycles', this)">
-      <div class="nav-icon">🔄</div>周期
-    </div>
-    <div class="nav-item" onclick="switchNav('settings', this)">
-      <div class="nav-icon">⚙️</div>設定
-    </div>
+    <div class="nav-item active" onclick="switchNav('home', this)">🏠 ホーム</div>
+    <div class="nav-item" onclick="switchNav('calendar', this)">📅 カレンダー</div>
+    <div class="nav-item" onclick="switchNav('records', this)">✏️ 記録</div>
+    <div class="nav-item" onclick="switchNav('cycles', this)">🔄 周期</div>
+    <div class="nav-item" onclick="switchNav('settings', this)">⚙️ 設定</div>
   </nav>
 
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbzYUDdWhVV1Qdple0XVik9WGRvga09LOafhQ1z2Mt6sDx-Ln66cdsU_pn94cTp0awsCQQ/exec';
-    
-    const state = {
-      cycle: null, cycles: [], daily: [], clinic: [], treatments: [], iui: [],
-      predictions: {}, currentCalMonth: new Date()
-    };
-    
-    // 【修正箇所】タイムゾーンのズレを防ぐため、Dateオブジェクトからローカル時間のYYYY-MM-DDを生成する関数
+    const state = { cycle: null, cycles: [], daily: [], clinic: [], iui: [], currentCalMonth: new Date() };
+
+    // 【最重要】タイムゾーンのズレを完全に排除し、常に日本時間のYYYY-MM-DDを返す関数
     function toLocalYYYYMMDD(dateInput) {
       if (!dateInput) return '';
       const d = new Date(dateInput);
       if (isNaN(d)) return '';
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
-
-    function getTodayStr() { 
-      return toLocalYYYYMMDD(new Date()); 
-    }
-
-    async function init() {
-      // Set Date Headers
-      const d = new Date();
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      document.getElementById('header-date').innerText = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
-      
-      const todayStr = getTodayStr();
-      document.getElementById('daily-date').value = todayStr;
-      document.getElementById('clinic-date').value = todayStr;
-      document.getElementById('new-cycle-date').value = todayStr;
-      
-      await fetchAllData();
-      renderCalendar();
+      return new Intl.DateTimeFormat('ja-JP', {
+        year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo'
+      }).format(d).replace(/\//g, '-');
     }
 
     async function fetchAllData() {
       showLoading(true);
       try {
-        const fetchTable = async (t) => (await fetch(API_URL + `?table=${t}`)).json();
-        const [cycles, daily, clinic, treatments, iui] = await Promise.all([
-          fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('treatments'), fetchTable('iui_events')
+        const fetchTable = async (t) => (await fetch(`${API_URL}?table=${t}`)).json();
+        const [cycles, daily, clinic, iui] = await Promise.all([
+          fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events')
         ]);
-        
         state.cycles = cycles;
         if (cycles.length > 0) {
-          state.cycle = cycles[cycles.length - 1]; 
+          state.cycle = cycles[cycles.length - 1];
           const cid = state.cycle.id;
           state.daily = daily.filter(d => d.cycle_id === cid);
           state.clinic = clinic.filter(c => c.cycle_id === cid);
-          state.treatments = treatments.filter(t => t.cycle_id === cid);
           state.iui = iui.filter(i => i.cycle_id === cid);
-          
-          calculatePredictions();
           renderDashboard();
-          renderCyclesList();
-        } else {
-          document.getElementById('badge-status').innerText = '未設定';
-          document.getElementById('badge-day').innerText = '';
-          document.getElementById('task-list').innerHTML = '<div class="task-item"><div class="task-dot"></div><div>まずは周期を登録してください</div></div>';
         }
-      } catch (err) {
-        console.error("データ同期エラー", err);
-      }
+      } catch (e) { console.error(e); }
       showLoading(false);
     }
 
-    function calculatePredictions() {
-      let pOvu = null, pNextVisit = null, pIUI = null;
-      let actionList = [];
+    function renderDashboard() {
+      if (!state.cycle) return;
+      const today = getTodayStr();
+      const startD = toLocalYYYYMMDD(state.cycle.start_date);
+      const diff = Math.floor((new Date(today) - new Date(startD)) / 86400000) + 1;
+      
+      document.getElementById('badge-day').innerText = `周期 ${diff}日目`;
+      document.getElementById('badge-status').innerText = "進行中";
 
       const latestClinic = state.clinic[state.clinic.length - 1];
-      if (latestClinic && latestClinic.next_visit_date) {
-        pNextVisit = new Date(latestClinic.next_visit_date);
-        actionList.push(`🏥 <b>${formatDateObj(pNextVisit)}</b> : 次回通院`);
-      }
-
-      if (latestClinic && latestClinic.doctor_predict_date) {
-        pOvu = new Date(latestClinic.doctor_predict_date);
-      } else {
-        const positiveLH = state.daily.slice().reverse().find(d => d.lh_result === '陽性' || d.lh_result === '強陽性');
-        if (positiveLH) { pOvu = addDays(new Date(positiveLH.date), 1); }
-      }
+      const ovu = latestClinic?.doctor_predict_date ? toLocalYYYYMMDD(latestClinic.doctor_predict_date) : '-';
+      document.getElementById('dash-ovu-val').innerText = ovu;
 
       const latestIUI = state.iui[state.iui.length - 1];
-      if (latestIUI && latestIUI.planned_date) {
-        pIUI = new Date(latestIUI.planned_date);
-        const abstainStart = addDays(pIUI, -2);
-        if (new Date() < pIUI) {
-          actionList.push(`🕊 <b>${formatDateObj(abstainStart)}〜</b> : 禁欲期間開始`);
-        }
-      }
-      
-      // 今日のタスク判定 (未入力なら促す)
-      const todayStr = getTodayStr();
-      // 【修正箇所】toLocalYYYYMMDD を使ってローカル時間の日付文字列で比較
-      const todayRecord = state.daily.find(d => d.date && toLocalYYYYMMDD(d.date) === todayStr);
-      if(!todayRecord || !todayRecord.temperature) {
-        actionList.unshift(`🌡 <b>本日</b> : 基礎体温の記録を確認`);
-      }
+      const iuiDate = latestIUI?.planned_date ? toLocalYYYYMMDD(latestIUI.planned_date) : '-';
+      document.getElementById('dash-iui-val').innerText = iuiDate;
 
-      state.predictions = { ovu: pOvu, nextVisit: pNextVisit, iui: pIUI, actions: actionList };
-    }
-
-    function renderDashboard() {
-      if(!state.cycle) return;
-      
-      // Days calculation
-      const startD = new Date(state.cycle.start_date); startD.setHours(0,0,0,0);
-      const today = new Date(); today.setHours(0,0,0,0);
-      const diffDays = Math.floor((today - startD) / (1000 * 60 * 60 * 24)) + 1;
-      
-      // Determine phase
-      let phase = "低温期";
-      if(state.predictions.ovu && today > state.predictions.ovu) phase = "高温期";
-      
-      document.getElementById('badge-status').innerText = phase;
-      document.getElementById('badge-day').innerText = `周期 ${diffDays}日目`;
-
-      // Next Actions
-      const acts = state.predictions.actions;
-      document.getElementById('task-list').innerHTML = acts.length > 0 
-        ? acts.map(a => `<div class="task-item" style="margin-bottom:8px;"><div class="task-dot"></div><div>${a}</div></div>`).join('')
-        : '<div class="task-item" style="color:var(--text-sub)">現在予定されているタスクはありません</div>';
-
-      // Grid Values
-      const p = state.predictions;
-      document.getElementById('dash-ovu-val').innerText = p.ovu ? formatDateObj(p.ovu) : '-';
-      document.getElementById('dash-period-val').innerText = formatDateObj(addDays(startD, 31)); // 31日平均
-      document.getElementById('dash-iui-val').innerText = p.iui ? formatDateObj(p.iui) : '-';
-      document.getElementById('dash-abstinence-val').innerText = p.iui ? formatDateObj(addDays(p.iui, -2)) : '-';
-    }
-    
-    function renderCyclesList() {
-      const list = document.getElementById('cycles-list');
-      list.innerHTML = '';
-      state.cycles.slice().reverse().forEach(c => {
-        const sD = new Date(c.start_date);
-        const eD = c.end_date ? new Date(c.end_date) : new Date(); // Mock end for active
-        const diff = Math.floor((eD - sD)/(1000*60*60*24)) + 1;
-        const statusStr = c.status === '周期終了' ? '周期終了' : '進行中';
-        
-        list.innerHTML += `
-          <div class="menu-item" style="flex-direction:column; align-items:flex-start; cursor:default;">
-            <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:8px;">
-              <div style="display:flex; gap:8px;">
-                <span style="background:#F2F2F7; padding:2px 8px; border-radius:8px; font-size:11px; color:#8E8E93">${statusStr}</span>
-                <span style="font-size:11px; color:var(--text-sub); align-self:center;">${c.type}</span>
-              </div>
-            </div>
-            <div style="font-size:16px; font-weight:500;">${formatDateObj(sD, true)} 〜</div>
-            <div style="font-size:12px; color:var(--text-sub); margin-top:4px;">${diff}日間</div>
-          </div>
-        `;
-      });
-    }
-
-    // --- Calendar Logic ---
-    function changeMonth(delta) {
-      state.currentCalMonth.setMonth(state.currentCalMonth.getMonth() + delta);
-      renderCalendar();
+      const taskUI = document.getElementById('task-list');
+      taskUI.innerHTML = state.daily.find(d => toLocalYYYYMMDD(d.date) === today) 
+        ? '<div class="task-item">✅ 今日の記録は完了しています</div>'
+        : '<div class="task-item"><div class="task-dot"></div>🌡 基礎体温を記録しましょう</div>';
     }
 
     function renderCalendar() {
@@ -658,171 +271,67 @@
       const month = state.currentCalMonth.getMonth();
       document.getElementById('cal-month-title').innerText = `${year}年${month + 1}月`;
       
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const startPadding = firstDay.getDay();
-      const totalDays = lastDay.getDate();
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const recordDates = new Set([...state.daily, ...state.clinic].map(r => toLocalYYYYMMDD(r.date || r.visit_date)));
       
       let html = '';
-      for(let i=0; i<startPadding; i++) html += `<div class="cal-cell empty"></div>`;
-      
-      const todayStr = getTodayStr();
-      
-      // 【修正箇所】記録の抽出時にローカル時間の文字列でSetを作成する
-      const recordDates = new Set();
-      state.daily.forEach(d => { if(d.date) recordDates.add(toLocalYYYYMMDD(d.date)); });
-      state.clinic.forEach(c => { if(c.visit_date) recordDates.add(toLocalYYYYMMDD(c.visit_date)); });
-      
-      for(let i=1; i<=totalDays; i++) {
-        const cellDate = new Date(year, month, i);
-        // 【修正箇所】カレンダーセルの日付もローカル時間文字列で生成
-        const dateStr = toLocalYYYYMMDD(cellDate);
-        const isToday = dateStr === todayStr;
-        const hasRecord = recordDates.has(dateStr);
-        
-        let classes = "cal-cell";
-        if(isToday) classes += " today";
-        
-        html += `<div class="${classes}" onclick="selectDate('${dateStr}', this)">
-          ${i}
-          ${hasRecord ? '<div class="cal-dot"></div>' : ''}
-        </div>`;
+      for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell empty"></div>';
+      for (let i = 1; i <= lastDay; i++) {
+        const dStr = toLocalYYYYMMDD(new Date(year, month, i));
+        const isToday = dStr === getTodayStr();
+        html += `<div class="cal-cell ${isToday ? 'today' : ''}" onclick="selectDate('${dStr}', this)">${i}${recordDates.has(dStr) ? '<div class="cal-dot"></div>' : ''}</div>`;
       }
       document.getElementById('cal-days-grid').innerHTML = html;
-      
-      // Auto select today
-      setTimeout(() => {
-        const todayEl = document.querySelector('.cal-cell.today');
-        if(todayEl) selectDate(todayStr, todayEl);
-      }, 50);
-    }
-    
-    function selectDate(dateStr, element) {
-      document.querySelectorAll('.cal-cell').forEach(el => el.classList.remove('selected'));
-      element.classList.add('selected');
-      
-      const d = new Date(dateStr);
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      document.getElementById('cal-selected-date').innerText = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
-      
-      // 【修正箇所】ローカル時間の文字列でレコードを検索
-      const dailyRecord = state.daily.find(r => r.date && toLocalYYYYMMDD(r.date) === dateStr);
-      const clinicRecord = state.clinic.find(r => r.visit_date && toLocalYYYYMMDD(r.visit_date) === dateStr);
-      
-      let detailHtml = '';
-      if(!dailyRecord && !clinicRecord) {
-        detailHtml = `
-          <div class="cal-detail-empty">この日の記録はありません</div>
-          <button class="btn-outline" onclick="openForm('daily')">記録を追加</button>
-        `;
-      } else {
-        if(dailyRecord) {
-          detailHtml += `<div style="background:var(--card-bg); padding:16px; border-radius:12px; text-align:left; margin-bottom:8px; box-shadow: 0 1px 4px rgba(0,0,0,0.05);">
-            <div style="font-size:12px; color:var(--text-sub); margin-bottom:4px;">日次記録</div>
-            <div>🌡 体温: ${dailyRecord.temperature ? dailyRecord.temperature + '°C' : '-'}</div>
-            <div>タイミング: ${dailyRecord.timing ? '済' : '-'}</div>
-          </div>`;
-        }
-        if(clinicRecord) {
-          detailHtml += `<div style="background:var(--card-bg); padding:16px; border-radius:12px; text-align:left; box-shadow: 0 1px 4px rgba(0,0,0,0.05);">
-            <div style="font-size:12px; color:var(--text-sub); margin-bottom:4px;">通院記録</div>
-            <div>🏥 受診あり</div>
-          </div>`;
-        }
-      }
-      document.getElementById('cal-record-content').innerHTML = detailHtml;
     }
 
-    // --- Actions ---
+    function selectDate(dStr, el) {
+      document.querySelectorAll('.cal-cell').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('cal-selected-date').innerText = dStr;
+      
+      const dRec = state.daily.find(r => toLocalYYYYMMDD(r.date) === dStr);
+      document.getElementById('cal-record-content').innerHTML = dRec 
+        ? `<div class="card">🌡 体温: ${dRec.temperature}°C<br>LH: ${dRec.lh_result}</div>`
+        : '<p style="color:var(--text-sub)">記録なし</p>';
+    }
+
     async function saveRecord(type) {
-      if (!state.cycle) return alert('周期がありません');
       showLoading(true);
-      
-      let payload = { cycle_id: state.cycle.id };
-      
-      if (type === 'daily') {
-        payload.table = 'daily_records';
-        payload.date = document.getElementById('daily-date').value;
-        payload.temperature = document.getElementById('daily-temp').value;
-        payload.lh_result = document.getElementById('daily-lh').value;
-        payload.timing = document.getElementById('daily-timing').checked;
-        payload.abstinence = document.getElementById('daily-abstinence').checked;
-        payload.condition = ''; 
-      } else if (type === 'clinic') {
-        payload.table = 'clinic_visits';
-        payload.visit_date = document.getElementById('clinic-date').value;
-        payload.follicle_r = ''; payload.follicle_l = ''; 
-        payload.doctor_predict_date = document.getElementById('clinic-predict').value;
-        payload.next_visit_date = document.getElementById('clinic-next').value;
-      } else if (type === 'iui') {
-        payload.table = 'iui_events';
-        payload.planned_date = document.getElementById('iui-planned').value;
-      }
-
-      try {
-        await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-        // Clear inputs
-        document.querySelectorAll(`#view-form-${type} input[type="number"]`).forEach(i => i.value = '');
-        await fetchAllData();
-        renderCalendar();
-        closeForm();
-      } catch (e) { alert('保存エラー'); }
-      showLoading(false);
+      const payload = { 
+        table: type === 'daily' ? 'daily_records' : type === 'clinic' ? 'clinic_visits' : 'iui_events',
+        cycle_id: state.cycle.id,
+        date: document.getElementById(type + '-date').value,
+        visit_date: document.getElementById(type + '-date').value,
+        temperature: document.getElementById('daily-temp')?.value,
+        lh_result: document.getElementById('daily-lh')?.value,
+        doctor_predict_date: document.getElementById('clinic-predict')?.value,
+        next_visit_date: document.getElementById('clinic-next')?.value,
+        planned_date: document.getElementById('iui-planned')?.value
+      };
+      await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+      await fetchAllData();
+      closeForm();
     }
 
-    async function startNewCycle() {
-      const selectedDate = document.getElementById('new-cycle-date').value;
-      const type = document.getElementById('new-cycle-type').value;
-      if (!selectedDate) return;
-      showLoading(true);
-      const payload = { table: 'cycles', start_date: selectedDate, type: type, status: '進行中' };
-      try {
-        await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-        await fetchAllData();
-        closeForm();
-        switchNav('home', document.querySelector('.nav-item'));
-      } catch (e) { alert('エラー'); }
-      showLoading(false);
+    function getTodayStr() { return toLocalYYYYMMDD(new Date()); }
+    function showLoading(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
+    function switchNav(v, el) { 
+      document.querySelectorAll('.view-container').forEach(c => c.classList.add('hidden'));
+      document.getElementById('view-' + v).classList.remove('hidden');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      el.classList.add('active');
+      if (v === 'calendar') renderCalendar();
     }
+    function openForm(f) { switchNav('form-' + f, {}); }
+    function closeForm() { switchNav('home', document.querySelector('.nav-item')); }
+    function changeMonth(d) { state.currentCalMonth.setMonth(state.currentCalMonth.getMonth() + d); renderCalendar(); }
 
-    // --- View Routing ---
-    let previousNavView = 'home';
-    
-    function switchNav(viewId, element) {
-      // Hide all forms if open
-      document.querySelectorAll('.view-container').forEach(el => el.classList.add('hidden'));
-      // Show target
-      document.getElementById('view-' + viewId).classList.remove('hidden');
-      // Update nav styling
-      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      element.classList.add('active');
-      previousNavView = viewId;
-      window.scrollTo(0,0);
-    }
-    
-    function openForm(formId) {
-      document.querySelectorAll('.view-container').forEach(el => el.classList.add('hidden'));
-      document.getElementById('view-form-' + formId).classList.remove('hidden');
-      window.scrollTo(0,0);
-    }
-    
-    function closeForm() {
-      document.querySelectorAll('.view-container').forEach(el => el.classList.add('hidden'));
-      document.getElementById('view-' + previousNavView).classList.remove('hidden');
-    }
-
-    // --- Helpers ---
-    function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
-    function addDays(date, days) { let r = new Date(date); r.setDate(r.getDate() + days); return r; }
-    function formatDateObj(d, includeYear=false) { 
-      if(isNaN(d)) return '-';
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      let str = `${d.getMonth()+1}/${d.getDate()}`;
-      if(includeYear) str = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
-      return str;
-    }
-
-    init();
+    window.onload = () => {
+      const today = getTodayStr();
+      document.querySelectorAll('input[type="date"]').forEach(i => i.value = today);
+      fetchAllData();
+    };
   </script>
 </body>
 </html>
