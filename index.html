@@ -12,26 +12,29 @@
       --primary: #007AFF; --primary-light: #e5f1ff; --bg: #f2f2f7; --card-bg: #ffffff;
       --text: #1c1c1e; --text-sub: #8e8e93; --danger: #FF3B30; --success: #34C759;
     }
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding-bottom: 80px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding-bottom: 80px; overflow-x: hidden; }
     * { box-sizing: border-box; }
     h2, h3 { margin-top: 0; margin-bottom: 12px; }
     
     /* Layout */
-    .container { padding: 16px; }
+    .container { padding: 16px; width: 100vw; max-width: 100%; }
     .hidden { display: none !important; }
     
     /* Cards & Badges */
-    .card { background: var(--card-bg); padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card { background: var(--card-bg); padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%; }
     .badge { display: inline-block; padding: 4px 8px; border-radius: 8px; background-color: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: bold; }
-    .badge.danger { background-color: #ffeceb; color: var(--danger); }
-    .badge.success { background-color: #eaf8ed; color: var(--success); }
     
     /* Forms */
-    .form-group { margin-bottom: 12px; }
+    .form-group { margin-bottom: 12px; width: 100%; }
     .form-group label { display: block; font-size: 14px; margin-bottom: 4px; color: var(--text-sub); }
-    .form-control { width: 100%; padding: 12px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 16px; background-color: #fafafa; }
-    .row { display: flex; gap: 8px; }
-    .col { flex: 1; }
+    /* iPhone Safariでの横はみ出しを防止 */
+    .form-control { 
+      width: 100%; max-width: 100%; padding: 12px; border: 1px solid #d1d1d6; 
+      border-radius: 8px; font-size: 16px; background-color: #fafafa; 
+      -webkit-appearance: none; margin: 0; display: block;
+    }
+    .row { display: flex; gap: 8px; width: 100%; }
+    .col { flex: 1; min-width: 0; }
     
     /* Buttons */
     .btn { background-color: var(--primary); color: white; border: none; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; text-align: center; margin-bottom: 8px;}
@@ -73,13 +76,17 @@
         <div style="font-size:12px; color:var(--text-sub);">人工授精(IUI)</div>
         <div id="pred-iui" class="dash-value">-</div>
       </div>
-      <div class="dash-item">
-        <div style="font-size:12px; color:var(--text-sub);">妊娠判定推奨</div>
-        <div id="pred-test" class="dash-value">-</div>
-      </div>
+      <!-- 妊娠判定推奨は要件により削除 -->
     </div>
     
-    <button class="btn btn-outline" onclick="startNewCycle()">🔄 新規周期を開始</button>
+    <div class="card" style="margin-top: 24px; background-color: transparent; border: 1px dashed #d1d1d6; box-shadow: none;">
+      <h3 style="font-size: 16px;">🔄 新規周期の登録</h3>
+      <div class="form-group">
+        <label>開始日 (過去日付も選択可)</label>
+        <input type="date" id="new-cycle-date" class="form-control">
+      </div>
+      <button class="btn btn-outline" onclick="startNewCycle()">新しい周期を登録する</button>
+    </div>
   </div>
 
   <!-- View: Daily Record -->
@@ -106,19 +113,16 @@
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>
+      <div class="form-group" style="padding-top: 8px;">
+        <label style="display: inline-block; margin-right: 16px;">
           <input type="checkbox" id="daily-timing"> タイミング実施
         </label>
-        <label style="margin-left:16px;">
+        <label style="display: inline-block;">
           <input type="checkbox" id="daily-abstinence"> 禁欲中
         </label>
       </div>
-      <div class="form-group">
-        <label>体調・メモ</label>
-        <input type="text" id="daily-condition" class="form-control" placeholder="おりもの状態や特記事項">
-      </div>
-      <button class="btn" onclick="saveRecord('daily')">記録を保存</button>
+      <!-- 体調・メモ入力は要件により削除 -->
+      <button class="btn" style="margin-top: 16px;" onclick="saveRecord('daily')">記録を保存</button>
     </div>
   </div>
 
@@ -132,16 +136,7 @@
         <label>受診日</label>
         <input type="date" id="clinic-date" class="form-control">
       </div>
-      <div class="row">
-        <div class="form-group col">
-          <label>右卵胞 (mm)</label>
-          <input type="number" id="clinic-follicle-r" class="form-control">
-        </div>
-        <div class="form-group col">
-          <label>左卵胞 (mm)</label>
-          <input type="number" id="clinic-follicle-l" class="form-control">
-        </div>
-      </div>
+      <!-- 卵胞サイズ入力は要件により削除 -->
       <div class="form-group">
         <label>医師の排卵見込み日 (最優先)</label>
         <input type="date" id="clinic-predict" class="form-control">
@@ -180,7 +175,6 @@
     // ★ご自身のGAS URLに書き換えてください
     const API_URL = 'https://script.google.com/macros/s/AKfycbzYUDdWhVV1Qdple0XVik9WGRvga09LOafhQ1z2Mt6sDx-Ln66cdsU_pn94cTp0awsCQQ/exec';
     
-    // アプリ内状態 (Store)
     const state = {
       cycle: null,
       daily: [],
@@ -190,14 +184,16 @@
       predictions: {}
     };
 
-    // 初期化
     async function init() {
-      document.getElementById('daily-date').valueAsDate = new Date();
-      document.getElementById('clinic-date').valueAsDate = new Date();
+      // 日付の初期値を今日にセット
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('daily-date').value = today;
+      document.getElementById('clinic-date').value = today;
+      document.getElementById('new-cycle-date').value = today;
+      
       await fetchAllData();
     }
 
-    // データフェッチ
     async function fetchAllData() {
       showLoading(true);
       try {
@@ -218,6 +214,7 @@
           renderDashboard();
         } else {
           document.getElementById('next-actions').innerHTML = '<div class="dash-value">周期が登録されていません</div>';
+          document.getElementById('cycle-day-badge').innerText = '未設定';
         }
       } catch (err) {
         alert("データ同期エラー: " + err.message);
@@ -225,70 +222,61 @@
       showLoading(false);
     }
 
-    // 予測ロジックエンジン
     function calculatePredictions() {
-      let pOvu = null, pNextVisit = null, pIUI = null, pTest = null;
+      let pOvu = null, pNextVisit = null, pIUI = null;
       let actionList = [];
 
-      // 1. 次回受診日
       const latestClinic = state.clinic[state.clinic.length - 1];
       if (latestClinic && latestClinic.next_visit_date) {
         pNextVisit = new Date(latestClinic.next_visit_date);
         actionList.push(`🏥 <b>${formatDate(pNextVisit)}</b> : 次回チェック`);
       }
 
-      // 2. 排卵日予測 (優先順位順)
       if (latestClinic && latestClinic.doctor_predict_date) {
-        pOvu = new Date(latestClinic.doctor_predict_date); // 1) 医師優先
+        pOvu = new Date(latestClinic.doctor_predict_date);
       } else {
         const positiveLH = state.daily.slice().reverse().find(d => d.lh_result === '陽性' || d.lh_result === '強陽性');
         if (positiveLH) {
-          pOvu = addDays(new Date(positiveLH.date), 1); // 4) LH陽性の翌日
+          pOvu = addDays(new Date(positiveLH.date), 1);
         }
       }
 
-      // 3. IUI日と妊娠判定推奨日
       const latestIUI = state.iui[state.iui.length - 1];
       if (latestIUI && latestIUI.planned_date) {
         pIUI = new Date(latestIUI.planned_date);
-        pTest = addDays(pIUI, 14); // IUI実施から14日後
-        
-        // 禁欲開始日の計算 (IUIの2日前)
         const abstainStart = addDays(pIUI, -2);
         if (new Date() < pIUI) {
           actionList.push(`🕊 <b>${formatDate(abstainStart)}〜</b> : 調整開始(禁欲)`);
           actionList.push(`🌱 <b>${formatDate(pIUI)}</b> : IUI (人工授精)`);
         }
-      } else if (pOvu) {
-        pTest = addDays(pOvu, 14); // 排卵から14日後
       }
 
-      state.predictions = { ovu: pOvu, nextVisit: pNextVisit, iui: pIUI, test: pTest, actions: actionList };
+      // 妊娠判定ロジックを削除
+      state.predictions = { ovu: pOvu, nextVisit: pNextVisit, iui: pIUI, actions: actionList };
     }
 
-    // ダッシュボードUI反映
     function renderDashboard() {
-      // 周期日数計算
+      if(!state.cycle) return;
+      
       const startD = new Date(state.cycle.start_date);
       const today = new Date();
-      const diffTime = Math.abs(today - startD);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      // 時間をリセットして純粋な日数差を計算
+      startD.setHours(0,0,0,0);
+      today.setHours(0,0,0,0);
+      const diffTime = today - startD;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // 開始日をD1とする
       document.getElementById('cycle-day-badge').innerText = `D${diffDays}`;
 
-      // アクション
       const acts = state.predictions.actions;
       document.getElementById('next-actions').innerHTML = acts.length > 0 
         ? acts.map(a => `<div style="margin-bottom:8px;">${a}</div>`).join('')
         : '<div style="color:var(--text-sub);">現在予定されているアクションはありません</div>';
 
-      // スケジュール
       const p = state.predictions;
       document.getElementById('pred-ovulation').innerHTML = p.ovu ? formatDate(p.ovu) + ' 頃' : '<span style="color:#ccc">データ不足</span>';
       document.getElementById('pred-iui').innerHTML = p.iui ? formatDate(p.iui) : '<span style="color:#ccc">未定</span>';
-      document.getElementById('pred-test').innerHTML = p.test ? formatDate(p.test) + ' 以降' : '<span style="color:#ccc">未定</span>';
     }
 
-    // 保存処理 (汎用POST)
     async function saveRecord(type) {
       if (!state.cycle) return alert('周期がありません');
       showLoading(true);
@@ -302,12 +290,12 @@
         payload.lh_result = document.getElementById('daily-lh').value;
         payload.timing = document.getElementById('daily-timing').checked;
         payload.abstinence = document.getElementById('daily-abstinence').checked;
-        payload.condition = document.getElementById('daily-condition').value;
+        payload.condition = ''; // 削除済のため空文字を送信
       } else if (type === 'clinic') {
         payload.table = 'clinic_visits';
         payload.visit_date = document.getElementById('clinic-date').value;
-        payload.follicle_r = document.getElementById('clinic-follicle-r').value;
-        payload.follicle_l = document.getElementById('clinic-follicle-l').value;
+        payload.follicle_r = ''; // 削除済のため空文字を送信
+        payload.follicle_l = ''; // 削除済のため空文字を送信
         payload.doctor_predict_date = document.getElementById('clinic-predict').value;
         payload.next_visit_date = document.getElementById('clinic-next').value;
       } else if (type === 'iui') {
@@ -317,10 +305,9 @@
 
       try {
         await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-        // 入力クリア
         document.querySelectorAll(`#view-${type} input[type="number"], #view-${type} input[type="text"]`).forEach(i => i.value = '');
         await fetchAllData();
-        switchView('home', document.querySelector('.nav-item')); // ホームへ戻す
+        switchView('home', document.querySelector('.nav-item'));
       } catch (e) {
         alert('保存エラー: ' + e.message);
       }
@@ -328,11 +315,19 @@
     }
 
     async function startNewCycle() {
-      if(!confirm('新しい周期を開始しますか？')) return;
+      const selectedDate = document.getElementById('new-cycle-date').value;
+      if (!selectedDate) return alert('開始日を選択してください');
+      if (!confirm(`${selectedDate} を開始日として新しい周期を登録しますか？`)) return;
+      
       showLoading(true);
-      const payload = { table: 'cycles', start_date: new Date().toISOString().split('T')[0], type: 'IUI', status: '生理中' };
-      await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-      await fetchAllData();
+      const payload = { table: 'cycles', start_date: selectedDate, type: 'IUI', status: '生理中' };
+      try {
+        await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+        await fetchAllData();
+      } catch (e) {
+        alert('エラーが発生しました: ' + e.message);
+      }
+      showLoading(false);
     }
 
     // --- Utility Functions ---
@@ -346,7 +341,7 @@
     function showLoading(show) {
       document.getElementById('loading').style.display = show ? 'block' : 'none';
       if(show) document.querySelectorAll('.container').forEach(el => el.classList.add('hidden'));
-      else document.getElementById('view-home').classList.remove('hidden'); // デフォルト復帰
+      else document.getElementById('view-home').classList.remove('hidden');
     }
 
     function addDays(date, days) {
