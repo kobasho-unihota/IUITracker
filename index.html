@@ -3,9 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <!-- PWA & iOS Home Screen Settings -->
+  <title>にんサポ</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>IUI Tracker</title>
+  <meta name="apple-mobile-web-app-title" content="にんサポ">
+  <meta name="theme-color" content="#D4A5A5">
+  
+  <!-- アイコン設定 (仮としてピンク背景に桜のSVGアイコンを設定しています。好みの画像ファイルパスに変更可能です) -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23D4A5A5%22/><text x=%2250%22 y=%2250%22 font-size=%2250%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>🌸</text></svg>">
+  <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;にんサポ&quot;,&quot;short_name&quot;:&quot;にんサポ&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#FDFBFB&quot;,&quot;theme_color&quot;:&quot;#D4A5A5&quot;}">
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -137,7 +145,6 @@
           
           Store.set({ cycles, daily, clinic, iui, activeCycle });
 
-          // ローカルストレージに設定がない場合、過去の実績から平均を算出して自動適用
           if (!localStorage.getItem('iui_settings')) {
             const stats = App.getCycleStats();
             if (stats.count > 0) {
@@ -220,7 +227,7 @@
           <div class="flex justify-between items-center mb-6 mt-4">
             <div>
               <div class="text-xs text-sub mb-1 font-medium">${Utils.toLocalYYYYMMDD(new Date()).replace(/-/g, '/')}</div>
-              <h1 class="text-2xl font-serif tracking-wider text-main">IUIスケジュール</h1>
+              <h1 class="text-2xl font-serif tracking-wider text-main">にんサポ</h1>
             </div>
             <div class="text-3xl bg-primary-light w-10 h-10 rounded-full flex items-center justify-center">🌸</div>
           </div>
@@ -330,7 +337,9 @@
               <div class="flex items-center gap-2"><span class="text-lg">♡</span><span class="text-[13px] font-bold">IUI管理</span></div><span class="text-gray-300">›</span>
             </button>
           </div>
-          <div class="bg-primary-light rounded-xl p-4 text-center text-[13px] text-[#8A6565] italic">妻のサポート、今日もお疲れ様です。</div>
+          <div class="bg-primary-light rounded-xl p-4 text-center text-[13px] text-[#8A6565] italic flex flex-col items-center justify-center gap-2">
+            <span>妻のサポート、今日もお疲れ様です。</span>
+          </div>
         `;
       },
 
@@ -353,12 +362,10 @@
           const hasRec = recordDates.has(dStr);
           
           let eventsHtml = '';
-          // 現在の周期
           if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
           if (dStr === preds.abstain) eventsHtml += '<span class="text-[10px]">🕊</span>';
           if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
           
-          // 次周期予測
           if (dStr === preds.nextIui && dStr !== preds.iui) eventsHtml += '<span class="text-[10px] opacity-40">🌸</span>';
           if (dStr === preds.nextAbstain && dStr !== preds.abstain) eventsHtml += '<span class="text-[10px] opacity-40">🕊</span>';
 
@@ -416,7 +423,6 @@
               <span class="text-xs text-sub">最新周期</span>
             </div>
             
-            <!-- Graph Legend -->
             <div class="flex gap-4 justify-center mb-4 text-[10px] text-sub">
               <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rotate-45 bg-[#F4A4A4]"></span>IUI</div>
             </div>
@@ -502,7 +508,7 @@
               </select>
             </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.0 Next Cycle & Graph Events</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.1 PWA Ready</p></div>
         `;
       }
     };
@@ -639,17 +645,16 @@
         const canvas = document.getElementById('tempChart');
         if (!canvas) return;
 
-        const { activeCycle, daily, clinic } = Store.get();
+        const { activeCycle, daily } = Store.get();
         if (!activeCycle) return;
+
+        const preds = App.getPredictions();
 
         const cycleDaily = daily
           .filter(d => d.cycle_id === activeCycle.id && d.temperature)
           .sort((a, b) => new Date(a.date) - new Date(b.date));
 
         if (cycleDaily.length === 0) return;
-
-        const preds = App.getPredictions();
-        const activeStartStr = Utils.toLocalYYYYMMDD(activeCycle.start_date);
 
         const labels = [];
         const data = [];
@@ -667,7 +672,6 @@
           let style = 'circle';
 
           if (dStr === preds.actual || dStr === preds.iui) {
-            // IUIのみをハイライト
             color = '#F4A4A4';
             radius = 8;
             style = 'rectRot';
@@ -832,7 +836,6 @@
           }
         }
         
-        // 次周期の予測計算
         if (preds.period) {
           preds.nextPeriod = preds.period;
           let iuiCycleDays = 14; 
@@ -873,12 +876,10 @@
         const preds = App.getPredictions();
         let eventContent = '';
         
-        // 今周期
         if (dStr === preds.iui) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#B07B7B]">🌸 IUI実施予定日</div>`;
         if (dStr === preds.abstain) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#8A6565]">🕊 禁欲開始日</div>`;
         if (dStr === preds.period) eventContent += `<div class="mb-1 text-[13px] font-bold text-red-400">🩸 次回生理予定日</div>`;
         
-        // 次周期
         if (dStr === preds.nextIui && dStr !== preds.iui) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#B07B7B]/70">🌸 次周期 IUI目安</div>`;
         if (dStr === preds.nextAbstain && dStr !== preds.abstain) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#8A6565]/70">🕊 次周期 禁欲開始</div>`;
 
