@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
+  <!-- PWA & iOS Home Screen Settings -->
   <title>にんサポ</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,7 +14,9 @@
   <link rel="apple-touch-icon" href="./icon.png">
   <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;にんサポ&quot;,&quot;short_name&quot;:&quot;にんサポ&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#FDFBFB&quot;,&quot;theme_color&quot;:&quot;#D4A5A5&quot;}">
   
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for Graph -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
@@ -47,29 +50,45 @@
     .bottom-sheet.closed { transform: translateY(100%); }
     .fade-in { animation: fadeIn 0.2s ease-in forwards; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    /* iOS Safe Area Paddings */
+    .padding-safe-nav { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 90px); }
+    .padding-safe-modal { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 40px); }
+    .padding-safe-toast { top: calc(env(safe-area-inset-top, 20px) + 10px); }
+    
+    /* フォーム要素のはみ出し防止 */
+    *, *::before, *::after { box-sizing: border-box; }
+    .form-control { 
+      width: 100% !important; 
+      max-width: 100% !important; 
+      box-sizing: border-box !important; 
+      -webkit-appearance: none !important; 
+      appearance: none !important; 
+    }
   </style>
 </head>
-<body class="text-main font-sans antialiased pb-[90px]">
+<body class="text-main font-sans antialiased overflow-x-hidden">
 
   <div id="global-loading" class="fixed inset-0 bg-white/90 z-[100] flex flex-col items-center justify-center fade-in">
     <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mb-4"></div>
     <div class="text-primary font-bold text-sm tracking-widest">LOADING...</div>
   </div>
 
-  <div id="toast" class="fixed top-12 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg whitespace-nowrap"></div>
+  <div id="toast" class="fixed padding-safe-toast left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg whitespace-nowrap"></div>
 
-  <main id="app-content" class="w-full min-h-screen px-4 pt-safe-top pb-safe-bottom hidden fade-in"></main>
+  <main id="app-content" class="w-full min-h-screen px-4 pt-4 padding-safe-nav hidden fade-in"></main>
 
   <div id="modal-overlay" class="fixed inset-0 bg-black/30 z-40 hidden transition-opacity opacity-0" onclick="App.closeModal()"></div>
-  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-bg rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] max-h-[90vh] overflow-y-auto no-scrollbar pb-safe-bottom flex flex-col">
-    <div class="sticky top-0 bg-bg/95 backdrop-blur z-10 px-6 py-4 flex justify-between items-center border-b border-border/50">
+  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-bg rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] max-h-[85vh] flex flex-col max-w-full overflow-x-hidden box-border">
+    <div class="sticky top-0 bg-bg/95 backdrop-blur z-10 px-6 py-4 flex justify-between items-center border-b border-border/50 shrink-0">
       <h3 id="modal-title" class="text-lg font-bold">タイトル</h3>
       <button onclick="App.closeModal()" class="text-sub p-2 -mr-2 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
     </div>
-    <div id="modal-body" class="p-6"></div>
+    <!-- flex-1とoverflow-y-autoでスクロール領域を明確に分離。下部に余白を追加 -->
+    <div id="modal-body" class="p-6 flex-1 overflow-y-auto no-scrollbar padding-safe-modal"></div>
   </div>
 
-  <nav class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-border z-30 pb-safe-bottom">
+  <nav class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-border z-30" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
     <div class="flex justify-around items-center h-[70px] px-2" id="nav-container">
       <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="home"><span class="text-2xl mb-0.5">🏠</span>ホーム</button>
       <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="calendar"><span class="text-2xl mb-0.5">📅</span>カレンダー</button>
@@ -104,7 +123,7 @@
       showToast: (msg, isError = false) => {
         const t = document.getElementById('toast');
         t.innerText = msg;
-        t.className = `fixed top-safe-top mt-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 shadow-lg ${isError ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'} opacity-100`;
+        t.className = `fixed padding-safe-toast left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 shadow-lg ${isError ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'} opacity-100`;
         setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 3000);
       }
     };
@@ -491,7 +510,7 @@
             <div class="mb-5">
               <label class="block text-[13px] text-main mb-2">平均周期日数</label>
               <div class="flex items-center gap-2">
-                <input type="number" id="set-cycle-len" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none font-bold" value="${settings.cycleLen}" onchange="App.updateSettings('cycleLen', this.value)">
+                <input type="number" id="set-cycle-len" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none font-bold" value="${settings.cycleLen}" onchange="App.updateSettings('cycleLen', this.value)">
                 <span class="text-sm font-bold text-sub">日</span>
               </div>
               ${statHtml}
@@ -499,12 +518,12 @@
             <hr class="border-border/50 mb-5">
             <div>
               <label class="block text-[13px] text-main mb-2">禁欲推奨日数</label>
-              <select id="set-abstinence" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('abstainDays', this.value)">
+              <select id="set-abstinence" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('abstainDays', this.value)">
                 <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option><option value="2" ${settings.abstainDays==2?'selected':''}>2日</option><option value="3" ${settings.abstainDays==3?'selected':''}>3日</option>
               </select>
             </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.1 PWA Ready</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.3 Overflow Fix</p></div>
         `;
       }
     };
@@ -515,14 +534,14 @@
         return `
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">日付</label>
-            <input type="date" id="form-date" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : Utils.getTodayStr()}" onchange="App.checkExistingDaily(this.value)">
+            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : Utils.getTodayStr()}" onchange="App.checkExistingDaily(this.value)">
           </div>
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">基礎体温 (°C)</label>
-            <input type="number" id="form-temp" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
+            <input type="number" id="form-temp" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('daily')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          <button onclick="App.submitForm('daily')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
       },
       clinic: (id) => {
@@ -530,14 +549,14 @@
         return `
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">受診日</label>
-            <input type="date" id="form-date" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : Utils.getTodayStr()}">
+            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : Utils.getTodayStr()}">
           </div>
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">次回受診の指示日</label>
-            <input type="date" id="form-next" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.next_visit_date ? Utils.toLocalYYYYMMDD(r.next_visit_date) : ''}">
+            <input type="date" id="form-next" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.next_visit_date ? Utils.toLocalYYYYMMDD(r.next_visit_date) : ''}">
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('clinic')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          <button onclick="App.submitForm('clinic')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
       },
       iui: (id) => {
@@ -557,7 +576,7 @@
         return `
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">予定日</label>
-            <input type="date" id="form-planned" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.planned_date ? Utils.toLocalYYYYMMDD(r.planned_date) : Utils.getTodayStr()}">
+            <input type="date" id="form-planned" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.planned_date ? Utils.toLocalYYYYMMDD(r.planned_date) : Utils.getTodayStr()}">
           </div>
           
           <div class="mb-8 p-4 bg-gray-50 border border-border rounded-xl flex items-center justify-between">
@@ -572,7 +591,7 @@
           </div>
           
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('iui')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          <button onclick="App.submitForm('iui')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
       },
       'new-cycle': (id) => {
@@ -580,11 +599,11 @@
         return `
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">生理開始日</label>
-            <input type="date" id="form-date" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : Utils.getTodayStr()}">
+            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : Utils.getTodayStr()}">
           </div>
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">周期タイプ</label>
-            <select id="form-type" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
+            <select id="form-type" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
               <option value="人工授精周期" ${r.type==='人工授精周期'?'selected':''}>人工授精周期</option>
               <option value="排卵誘発周期" ${r.type==='排卵誘発周期'?'selected':''}>排卵誘発周期</option>
               <option value="自然周期" ${r.type==='自然周期'?'selected':''}>自然周期</option>
@@ -592,13 +611,13 @@
           </div>
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">ステータス</label>
-            <select id="form-status" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
+            <select id="form-status" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
               <option value="進行中" ${r.status==='進行中'?'selected':''}>進行中</option>
               <option value="周期終了" ${r.status==='周期終了'?'selected':''}>周期終了</option>
             </select>
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('cycles')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">周期を保存</button>
+          <button onclick="App.submitForm('cycles')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">周期を保存</button>
         `;
       },
       meds: () => `<div class="text-center text-sub py-10 font-bold">機能準備中</div>`
@@ -913,5 +932,6 @@
   </script>
 </body>
 </html>
+
 
 
