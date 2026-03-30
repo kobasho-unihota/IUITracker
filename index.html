@@ -7,498 +7,681 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>IUI Tracker</title>
   
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#D4A5A5',
+            'primary-light': '#F8EFEF',
+            bg: '#FDFBFB',
+            card: '#FFFFFF',
+            main: '#333333',
+            sub: '#8E8E93',
+            border: '#E5E5EA'
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Hiragino Sans"', 'sans-serif'],
+            serif: ['serif']
+          }
+        }
+      }
+    }
+  </script>
+  
   <style>
-    :root {
-      --primary: #D4A5A5;
-      --primary-light: #F8EFEF;
-      --bg: #FDFBFB;
-      --card-bg: #FFFFFF;
-      --text-main: #333333;
-      --text-sub: #8E8E93;
-      --border: #E5E5EA;
-      --nav-height: 80px;
-    }
+    /* 最小限のカスタムCSS (スクロールバー非表示、タップハイライト無効化など) */
+    html, body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; background-color: #FDFBFB; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    html, body { 
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; 
-      background-color: var(--bg); 
-      color: var(--text-main); 
-      margin: 0; 
-      padding: 0; 
-      width: 100vw; 
-      overflow-x: hidden; 
-      -webkit-tap-highlight-color: transparent;
-    }
+    /* ボトムシートのアニメーション */
+    .bottom-sheet { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+    .bottom-sheet.open { transform: translateY(0); }
+    .bottom-sheet.closed { transform: translateY(100%); }
     
-    * { box-sizing: border-box; }
-    h1, h2, h3, h4 { margin: 0; font-weight: 600; }
-    
-    .view-container { 
-      padding: 16px 16px calc(var(--nav-height) + 20px) 16px; 
-      width: 100%; 
-      min-height: 100vh;
-    }
-    .hidden { display: none !important; }
-    
-    .page-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 24px; padding-top: env(safe-area-inset-top, 10px);
-    }
-    .page-title { font-size: 24px; font-weight: normal; font-family: serif; letter-spacing: 1px;}
-    .header-icon { font-size: 24px; }
-    
-    .back-btn { font-size: 16px; color: var(--text-main); cursor: pointer; padding: 12px 0; display: inline-block; }
-    
-    .card { 
-      background: var(--card-bg); border-radius: 20px; padding: 20px; 
-      margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); width: 100%;
-    }
-    
-    .badge-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; justify-content: space-between;}
-    .badge { 
-      display: inline-block; padding: 4px 12px; border-radius: 12px; 
-      background-color: var(--primary-light); color: #B07B7B; font-size: 12px; font-weight: bold; 
-    }
-    .cycle-day-text { font-size: 14px; color: var(--text-sub); }
-    
-    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
-    .dash-item { display: flex; flex-direction: column; }
-    .dash-label { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; }
-    .dash-val { font-size: 18px; font-weight: 600; }
-    .dash-sub { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
-    
-    .section-title { font-size: 14px; color: var(--text-main); margin-bottom: 12px; font-weight: 600; }
-    
-    .task-list { background: var(--card-bg); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); margin-bottom: 24px; }
-    .task-item { display: flex; align-items: center; font-size: 15px; }
-    .task-dot { width: 8px; height: 8px; background-color: var(--primary); border-radius: 50%; margin-right: 12px; }
-    
-    .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;}
-    .quick-btn {
-      background: var(--card-bg); border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: space-between;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.02); border: none; font-size: 14px; font-weight: 500; color: var(--text-main); cursor: pointer;
-    }
-    
-    .footer-msg {
-      background: var(--primary-light); border-radius: 12px; padding: 16px;
-      text-align: center; color: #8A6565; font-size: 13px; font-style: italic;
-    }
-    
-    .form-group { margin-bottom: 16px; width: 100%; }
-    .form-group label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-main); }
-    .form-control { 
-      width: 100%; max-width: 100%; padding: 14px; border: 1px solid var(--border); 
-      border-radius: 12px; font-size: 16px; background-color: var(--card-bg); -webkit-appearance: none; margin: 0; display: block;
-    }
-    
-    .btn-main { 
-      background-color: var(--primary); color: white; border: none; 
-      padding: 16px; border-radius: 16px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer; text-align: center; margin-top: 12px;
-    }
-    
-    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 18px; font-weight: 600;}
-    .cal-nav { background: none; border: none; font-size: 18px; cursor: pointer; padding: 8px;}
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-    .cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 16px; border-radius: 50%; cursor: pointer; position: relative; }
-    .cal-cell.empty { visibility: hidden; }
-    .cal-cell.selected { background-color: var(--primary); color: white; }
-    .cal-cell.today { font-weight: bold; border: 1px solid var(--primary); }
-    .cal-dot { width: 4px; height: 4px; background-color: var(--primary); border-radius: 50%; position: absolute; bottom: 4px; }
-    .cal-cell.selected .cal-dot { background-color: white; }
-    
-    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(253, 251, 251, 0.9); backdrop-filter: blur(10px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0 calc(env(safe-area-inset-bottom, 20px) + 10px) 0; z-index: 100; }
-    .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-sub); font-size: 10px; flex: 1; cursor: pointer; }
-    .nav-item.active { color: var(--primary); }
-    .nav-icon { font-size: 22px; margin-bottom: 4px; }
-    
-    #loading { position: fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.8); z-index:999; display:flex; align-items:center; justify-content:center; color: var(--primary); font-weight:bold; }
+    /* フェードアニメーション */
+    .fade-in { animation: fadeIn 0.2s ease-in forwards; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
-<body>
+<body class="text-main font-sans antialiased pb-[90px]">
 
-  <div id="loading">同期中...</div>
+  <!-- グローバルローディング (初回のみ) -->
+  <div id="global-loading" class="fixed inset-0 bg-white/90 z-[100] flex flex-col items-center justify-center fade-in">
+    <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mb-4"></div>
+    <div class="text-primary font-bold text-sm tracking-widest">LOADING...</div>
+  </div>
 
-  <!-- View: Home -->
-  <div id="view-home" class="view-container">
-    <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 4px;" id="header-date"></div>
-    <div class="page-header"><div class="page-title">IUIスケジュール</div><div class="header-icon">🌸</div></div>
-    <div class="card">
-      <div class="badge-wrap"><div id="badge-status" class="badge">-</div><div id="badge-day" class="cycle-day-text">-</div></div>
-      <div class="dash-grid">
-        <div class="dash-item"><div class="dash-label">IUI実施日(予定)</div><div id="dash-iui-val" class="dash-val">-</div></div>
-        <div class="dash-item"><div class="dash-label">禁欲開始日</div><div id="dash-abstinence-val" class="dash-val">-</div></div>
-        <div class="dash-item"><div class="dash-label">次回生理予定</div><div id="dash-period-val" class="dash-val">-</div><div class="dash-sub">±3日</div></div>
-      </div>
+  <!-- トースト通知 (非同期保存の結果表示など) -->
+  <div id="toast" class="fixed top-12 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg"></div>
+
+  <!-- === メインビューコンテナ === -->
+  <main id="app-content" class="w-full min-h-screen px-4 pt-safe-top pb-safe-bottom hidden fade-in">
+    <!-- 各画面はJavaScriptで動的にここにレンダリングされます -->
+  </main>
+
+  <!-- === ボトムシート (各種入力フォーム) === -->
+  <div id="modal-overlay" class="fixed inset-0 bg-black/30 z-40 hidden transition-opacity opacity-0" onclick="App.closeModal()"></div>
+  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-bg rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] max-h-[90vh] overflow-y-auto no-scrollbar pb-safe-bottom flex flex-col">
+    <div class="sticky top-0 bg-bg/95 backdrop-blur z-10 px-6 py-4 flex justify-between items-center border-b border-border/50">
+      <h3 id="modal-title" class="text-lg font-bold">タイトル</h3>
+      <button onclick="App.closeModal()" class="text-sub p-2 -mr-2 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
     </div>
-    <div class="section-title">サポートタスク</div>
-    <div id="task-list" class="task-list"></div>
-    <div class="section-title">クイック記録</div>
-    <div class="quick-grid">
-      <button class="quick-btn" onclick="prepareDailyForm()">🌡 基礎体温 <span>›</span></button>
-      <button class="quick-btn" onclick="openForm('clinic')">🩺 通院記録 <span>›</span></button>
-      <button class="quick-btn" onclick="openForm('meds')">💊 薬・注射 <span>›</span></button>
-      <button class="quick-btn" onclick="openForm('iui')">♡ IUI管理 <span>›</span></button>
-    </div>
-    <div class="footer-msg">妻のサポート、今日もお疲れ様です。</div>
-  </div>
-
-  <!-- View: Calendar -->
-  <div id="view-calendar" class="view-container hidden">
-    <div class="cal-header"><button class="cal-nav" onclick="changeMonth(-1)">‹</button><div id="cal-month-title"></div><button class="cal-nav" onclick="changeMonth(1)">›</button></div>
-    <div class="cal-grid" id="cal-days-grid"></div>
-    <div class="cal-detail"><div id="cal-selected-date" style="text-align:left; font-size:14px; color:var(--text-sub); margin:20px 0;"></div><div id="cal-record-content"></div></div>
-  </div>
-
-  <!-- View: Records -->
-  <div id="view-records" class="view-container hidden">
-    <div class="page-header"><div class="page-title">記録一覧</div></div>
-    <div id="full-records-list"></div>
-  </div>
-
-  <!-- View: Cycles -->
-  <div id="view-cycles" class="view-container hidden">
-    <div class="page-header"><div class="page-title">周期一覧</div></div>
-    <div id="cycles-list"></div>
-    <button class="btn-main" onclick="openForm('new-cycle')">＋ 新しい周期を登録</button>
-  </div>
-
-  <!-- View: Settings -->
-  <div id="view-settings" class="view-container hidden">
-    <div class="page-header"><div class="page-title">設定</div></div>
-    
-    <div class="section-title">周期設定</div>
-    <div class="card" style="margin-bottom: 24px;">
-      <div class="form-group">
-        <label>平均周期日数</label>
-        <select class="form-control" id="set-cycle-len" onchange="renderDashboard()">
-          <option value="28">28日</option><option value="31" selected>31日</option><option value="35">35日</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom: 0;">
-        <label>禁欲推奨日数</label>
-        <select class="form-control" id="set-abstinence" onchange="renderDashboard()">
-          <option value="1">1日</option><option value="2" selected>2日</option><option value="3">3日</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="card"><p style="text-align:center; font-size:12px; color:var(--text-sub);">Developed for Shogo & 🐈 Hotate, Uni</p></div>
-  </div>
-
-  <!-- Forms -->
-  <div id="view-form-daily" class="view-container hidden">
-    <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-    <div class="card">
-      <h3>日次記録</h3>
-      <input type="date" id="daily-date" class="form-control" onchange="loadDailyDataForDate(this.value)">
-      <div style="margin-top:16px;">
-        <label style="font-size: 13px; color: var(--text-main); margin-bottom:6px; display:block;">基礎体温 (°C)</label>
-        <input type="number" id="daily-temp" class="form-control" step="0.01" placeholder="例: 36.55">
-      </div>
-      <button class="btn-main" onclick="saveRecord('daily')">保存する</button>
-    </div>
-  </div>
-  
-  <div id="view-form-clinic" class="view-container hidden">
-    <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-    <div class="card">
-      <h3>通院記録</h3>
-      <label>受診日</label>
-      <input type="date" id="clinic-date" class="form-control">
-      <label style="margin-top:16px;">次回受診の指示日</label>
-      <input type="date" id="clinic-next" class="form-control">
-      <button class="btn-main" onclick="saveRecord('clinic')">保存する</button>
-    </div>
-  </div>
-  
-  <div id="view-form-iui" class="view-container hidden">
-    <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-    <div class="card">
-      <h3>IUI予定</h3>
-      <label>人工授精(IUI) 予定日</label>
-      <input type="date" id="iui-planned" class="form-control">
-      <button class="btn-main" onclick="saveRecord('iui')">保存する</button>
-    </div>
-  </div>
-  
-  <div id="view-form-new-cycle" class="view-container hidden">
-    <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-    <div class="card">
-      <h3>周期の登録・編集</h3>
-      <label>生理開始日</label>
-      <input type="date" id="new-cycle-date" class="form-control">
-      <label style="margin-top:16px;">周期タイプ</label>
-      <select id="new-cycle-type" class="form-control">
-        <option value="人工授精周期">人工授精周期</option><option value="排卵誘発周期">排卵誘発周期</option><option value="自然周期">自然周期</option>
-      </select>
-      <label style="margin-top:16px;">ステータス</label>
-      <select id="new-cycle-status" class="form-control">
-        <option value="進行中">進行中</option><option value="周期終了">周期終了</option>
-      </select>
-      <button class="btn-main" onclick="saveCycle()">周期を保存する</button>
+    <div id="modal-body" class="p-6">
+      <!-- フォームの中身が動的に入る -->
     </div>
   </div>
 
-  <div id="view-form-meds" class="view-container hidden">
-    <div class="back-btn" onclick="closeForm()">‹ 戻る</div>
-    <div class="card"><div style="text-align:center; color:var(--text-sub); padding:20px;">機能準備中</div></div>
-  </div>
-
-  <nav class="bottom-nav">
-    <div class="nav-item active" onclick="switchNav('home', this)">🏠 ホーム</div>
-    <div class="nav-item" onclick="switchNav('calendar', this)">📅 カレンダー</div>
-    <div class="nav-item" onclick="switchNav('records', this)">✏️ 記録</div>
-    <div class="nav-item" onclick="switchNav('cycles', this)">🔄 周期</div>
-    <div class="nav-item" onclick="switchNav('settings', this)">⚙️ 設定</div>
+  <!-- === ボトムナビゲーション === -->
+  <nav class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-border z-30 pb-safe-bottom">
+    <div class="flex justify-around items-center h-[70px] px-2" id="nav-container">
+      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="home">
+        <span class="text-2xl mb-0.5">🏠</span>ホーム
+      </button>
+      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="calendar">
+        <span class="text-2xl mb-0.5">📅</span>カレンダー
+      </button>
+      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="records">
+        <span class="text-2xl mb-0.5">✏️</span>記録
+      </button>
+      <button onclick="App.navigate('cycles')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="cycles">
+        <span class="text-2xl mb-0.5">🔄</span>周期
+      </button>
+      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="settings">
+        <span class="text-2xl mb-0.5">⚙️</span>設定
+      </button>
+    </div>
   </nav>
 
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzYUDdWhVV1Qdple0XVik9WGRvga09LOafhQ1z2Mt6sDx-Ln66cdsU_pn94cTp0awsCQQ/exec';
-    const state = { cycle: null, cycles: [], daily: [], clinic: [], iui: [], currentCalMonth: new Date() };
+    // --- 1. Constants & Utilities ---
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxHyWLD6EKwNQUHuBfvy0M7Cf636iFou4E6ndgtb0sfc8lKfAGPvmRUoPKMRbb1A_5WxA/exec';
     
-    let editingRecordId = null;
-
-    function toLocalYYYYMMDD(dateInput) {
-      if (!dateInput) return '';
-      const d = new Date(dateInput);
-      if (isNaN(d)) return '';
-      return new Intl.DateTimeFormat('ja-JP', {
-        year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo'
-      }).format(d).replace(/\//g, '-');
-    }
-
-    function addDays(dateStr, days) {
-      const d = new Date(dateStr);
-      if (isNaN(d)) return null;
-      d.setDate(d.getDate() + days);
-      return d;
-    }
-
-    function formatDateObj(d) {
-      if (!d || isNaN(d)) return '-';
-      return `${d.getMonth()+1}/${d.getDate()}`;
-    }
-
-    async function fetchAllData() {
-      showLoading(true);
-      try {
-        const fetchTable = async (t) => (await fetch(`${API_URL}?table=${t}`)).json();
-        const [cycles, daily, clinic, iui] = await Promise.all([
-          fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events')
-        ]);
-        state.cycles = cycles;
-        if (cycles.length > 0) {
-          state.cycle = cycles[cycles.length - 1];
-          const cid = state.cycle.id;
-          state.daily = daily.filter(d => d.cycle_id === cid);
-          state.clinic = clinic.filter(c => c.cycle_id === cid);
-          state.iui = iui.filter(i => i.cycle_id === cid);
-          renderDashboard();
-        }
-      } catch (e) { console.error(e); }
-      showLoading(false);
-    }
-
-    function renderDashboard() {
-      if (!state.cycle) return;
-      const today = getTodayStr();
-      const startD = state.cycle.start_date;
-      
-      const diff = Math.floor((new Date(today) - new Date(startD)) / 86400000) + 1;
-      document.getElementById('badge-day').innerText = `周期 ${diff}日目`;
-      document.getElementById('badge-status').innerText = state.cycle.status;
-      
-      // IUI Date
-      const latestIUI = state.iui[state.iui.length - 1];
-      const iuiDate = latestIUI?.planned_date ? new Date(latestIUI.planned_date) : null;
-      document.getElementById('dash-iui-val').innerText = iuiDate ? formatDateObj(iuiDate) : '-';
-
-      // Abstinence Date
-      const abstainDays = parseInt(document.getElementById('set-abstinence').value) || 2;
-      const abstainDate = iuiDate ? addDays(iuiDate, -abstainDays) : null;
-      document.getElementById('dash-abstinence-val').innerText = abstainDate ? formatDateObj(abstainDate) : '-';
-
-      // Period Date
-      const cycleLen = parseInt(document.getElementById('set-cycle-len').value) || 31;
-      const periodDate = addDays(startD, cycleLen);
-      document.getElementById('dash-period-val').innerText = periodDate ? formatDateObj(periodDate) : '-';
-
-      document.getElementById('task-list').innerHTML = state.daily.find(d => d.date && toLocalYYYYMMDD(d.date) === today) 
-        ? '<div class="task-item">✅ 今日の記録は完了しています</div>'
-        : '<div class="task-item"><div class="task-dot"></div>🌡 基礎体温を記録しましょう</div>';
-    }
-
-    function renderCyclesList() {
-      const list = document.getElementById('cycles-list');
-      list.innerHTML = state.cycles.slice().reverse().map(c => `
-        <div class="card" onclick="editCycle('${c.id}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <div style="font-weight:bold;">${toLocalYYYYMMDD(c.start_date)} 〜</div>
-            <div style="font-size:12px; color:var(--text-sub);">種別: ${c.type || '未設定'} / 状態: ${c.status}</div>
-          </div>
-          <div style="color:var(--text-sub); font-size:20px;">›</div>
-        </div>
-      `).join('') || '<p>周期データがありません</p>';
-    }
-
-    function editCycle(id) {
-      const c = state.cycles.find(x => x.id === id);
-      if(!c) return;
-      editingRecordId = c.id;
-      document.getElementById('new-cycle-date').value = toLocalYYYYMMDD(c.start_date);
-      document.getElementById('new-cycle-type').value = c.type || '人工授精周期';
-      document.getElementById('new-cycle-status').value = c.status || '進行中';
-      openForm('new-cycle');
-    }
-
-    function prepareDailyForm(dateStr) {
-      const targetDate = dateStr || getTodayStr();
-      document.getElementById('daily-date').value = targetDate;
-      loadDailyDataForDate(targetDate);
-      openForm('daily');
-    }
-
-    function loadDailyDataForDate(dateStr) {
-      const existing = state.daily.find(d => toLocalYYYYMMDD(d.date) === dateStr);
-      if (existing) {
-        editingRecordId = existing.id;
-        document.getElementById('daily-temp').value = existing.temperature || '';
-      } else {
-        editingRecordId = null;
-        document.getElementById('daily-temp').value = '';
+    const Utils = {
+      toLocalYYYYMMDD: (dateInput) => {
+        if (!dateInput) return '';
+        const d = new Date(dateInput);
+        if (isNaN(d)) return '';
+        return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' }).format(d).replace(/\//g, '-');
+      },
+      getTodayStr: () => Utils.toLocalYYYYMMDD(new Date()),
+      addDays: (dateStr, days) => {
+        const d = new Date(dateStr);
+        if (isNaN(d)) return null;
+        d.setDate(d.getDate() + days);
+        return d;
+      },
+      formatMMDD: (d) => {
+        if (!d || isNaN(d)) return '-';
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+      },
+      generateId: () => 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36),
+      showToast: (msg, isError = false) => {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.className = `fixed top-safe-top mt-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 shadow-lg ${isError ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'} opacity-100`;
+        setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 3000);
       }
-    }
-
-    function renderFullRecords() {
-      const list = document.getElementById('full-records-list');
-      const all = [...state.daily.map(d => ({...d, type: 'daily'})), ...state.clinic.map(c => ({...c, type: 'clinic', date: c.visit_date}))];
-      all.sort((a, b) => new Date(b.date) - new Date(a.date));
-      
-      list.innerHTML = all.map(r => `
-        <div class="card" onclick="${r.type === 'daily' ? `prepareDailyForm('${toLocalYYYYMMDD(r.date)}')` : ''}" style="cursor:pointer;">
-          <div style="font-weight:bold; margin-bottom:4px;">${toLocalYYYYMMDD(r.date)}</div>
-          ${r.type === 'daily' ? `🌡 体温: ${r.temperature || '-'}°C` : '🏥 クリニック受診'}
-        </div>
-      `).join('') || '<p>記録がありません</p>';
-    }
-
-    function renderCalendar() {
-      const year = state.currentCalMonth.getFullYear();
-      const month = state.currentCalMonth.getMonth();
-      document.getElementById('cal-month-title').innerText = `${year}年${month + 1}月`;
-      const firstDay = new Date(year, month, 1).getDay();
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      const recordDates = new Set([...state.daily, ...state.clinic].map(r => toLocalYYYYMMDD(r.date || r.visit_date)));
-      let html = '';
-      for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell empty"></div>';
-      for (let i = 1; i <= lastDay; i++) {
-        const dStr = toLocalYYYYMMDD(new Date(year, month, i));
-        const isToday = dStr === getTodayStr();
-        html += `<div class="cal-cell ${isToday ? 'today' : ''}" onclick="selectDate('${dStr}', this)">${i}${recordDates.has(dStr) ? '<div class="cal-dot"></div>' : ''}</div>`;
-      }
-      document.getElementById('cal-days-grid').innerHTML = html;
-    }
-
-    function selectDate(dStr, el) {
-      document.querySelectorAll('.cal-cell').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
-      document.getElementById('cal-selected-date').innerText = dStr;
-      const dRec = state.daily.find(r => toLocalYYYYMMDD(r.date) === dStr);
-      const cRec = state.clinic.find(r => toLocalYYYYMMDD(r.visit_date) === dStr);
-      let content = '';
-      if(dRec) content += `🌡 体温: ${dRec.temperature || '-'}°C<br>`;
-      if(cRec) content += `🏥 受診記録あり`;
-      
-      const actionHtml = `<button class="btn-outline" style="margin-top:12px; width:100%;" onclick="prepareDailyForm('${dStr}')">日次記録を入力・編集</button>`;
-      
-      document.getElementById('cal-record-content').innerHTML = content 
-        ? `<div class="card">${content}${actionHtml}</div>` 
-        : `<p style="color:var(--text-sub)">記録なし</p>${actionHtml}`;
-    }
-
-    async function saveRecord(type) {
-      if (!state.cycle) return alert('周期がありません');
-      showLoading(true);
-      
-      const payload = { 
-        action: editingRecordId ? 'update' : 'insert',
-        id: editingRecordId,
-        table: type === 'daily' ? 'daily_records' : type === 'clinic' ? 'clinic_visits' : 'iui_events',
-        cycle_id: state.cycle.id,
-        date: document.getElementById(type + '-date').value,
-        visit_date: document.getElementById(type + '-date').value,
-        temperature: document.getElementById('daily-temp')?.value,
-        lh_result: '', 
-        doctor_predict_date: '', 
-        next_visit_date: document.getElementById('clinic-next')?.value,
-        planned_date: document.getElementById('iui-planned')?.value
-      };
-      
-      await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-      editingRecordId = null;
-      await fetchAllData();
-      closeForm();
-    }
-
-    async function saveCycle() {
-      showLoading(true);
-      const payload = { 
-        action: editingRecordId ? 'update' : 'insert',
-        id: editingRecordId,
-        table: 'cycles', 
-        start_date: document.getElementById('new-cycle-date').value, 
-        type: document.getElementById('new-cycle-type').value, 
-        status: document.getElementById('new-cycle-status').value 
-      };
-      await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-      editingRecordId = null;
-      await fetchAllData();
-      closeForm();
-    }
-
-    function getTodayStr() { return toLocalYYYYMMDD(new Date()); }
-    function showLoading(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
-    
-    let previousNavView = 'home';
-    function switchNav(v, el) { 
-      editingRecordId = null;
-      document.querySelectorAll('.view-container').forEach(c => c.classList.add('hidden'));
-      document.getElementById('view-' + v).classList.remove('hidden');
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      el.classList.add('active');
-      previousNavView = v;
-      if (v === 'calendar') renderCalendar();
-      if (v === 'records') renderFullRecords();
-      if (v === 'cycles') renderCyclesList();
-      window.scrollTo(0,0);
-    }
-    
-    function openForm(f) { 
-      if(f === 'new-cycle' && !editingRecordId) {
-        document.getElementById('new-cycle-date').value = getTodayStr();
-        document.getElementById('new-cycle-status').value = '進行中';
-      }
-      document.querySelectorAll('.view-container').forEach(c => c.classList.add('hidden'));
-      document.getElementById('view-form-' + f).classList.remove('hidden');
-      window.scrollTo(0,0);
-    }
-    
-    function closeForm() { 
-      editingRecordId = null;
-      document.querySelectorAll('.view-container').forEach(c => c.classList.add('hidden'));
-      document.getElementById('view-' + previousNavView).classList.remove('hidden');
-    }
-    
-    function changeMonth(d) { state.currentCalMonth.setMonth(state.currentCalMonth.getMonth() + d); renderCalendar(); }
-
-    window.onload = () => {
-      const today = getTodayStr();
-      document.querySelectorAll('input[type="date"]').forEach(i => i.value = today);
-      fetchAllData();
-      const d = new Date();
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      document.getElementById('header-date').innerText = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
     };
+
+    // --- 2. State Management (Store) ---
+    const Store = {
+      state: {
+        currentView: 'home',
+        cycles: [],
+        daily: [],
+        clinic: [],
+        iui: [],
+        activeCycle: null,
+        calMonth: new Date(),
+        settings: { cycleLen: 31, abstainDays: 2 }
+      },
+      set(updates) {
+        this.state = { ...this.state, ...updates };
+        App.render(); // 状態が変わるたびにUIを再描画
+      },
+      get() { return this.state; }
+    };
+
+    // --- 3. API Communication ---
+    const API = {
+      async fetchAll() {
+        try {
+          const fetchTable = async (t) => (await fetch(`${API_URL}?table=${t}`)).json();
+          const [cycles, daily, clinic, iui] = await Promise.all([
+            fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events')
+          ]);
+          
+          // 周期を開始日順でソート（過去日の登録に対応）
+          cycles.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+          
+          let activeCycle = null;
+          let filteredDaily = [], filteredClinic = [], filteredIUI = [];
+          
+          if (cycles.length > 0) {
+            activeCycle = cycles[cycles.length - 1]; // 開始日が最新のものをアクティブとする
+            filteredDaily = daily.filter(d => d.cycle_id === activeCycle.id);
+            filteredClinic = clinic.filter(c => c.cycle_id === activeCycle.id);
+            filteredIUI = iui.filter(i => i.cycle_id === activeCycle.id);
+          }
+          
+          Store.set({ cycles, daily: filteredDaily, clinic: filteredClinic, iui: filteredIUI, activeCycle });
+        } catch (e) {
+          Utils.showToast('データ同期に失敗しました', true);
+          console.error(e);
+        }
+      },
+      // Optimistic UI アプローチ: UIを即座に更新し、裏でAPIを叩く
+      async save(table, payloadData) {
+        const { activeCycle } = Store.get();
+        if (table !== 'cycles' && !activeCycle) {
+          Utils.showToast('周期が存在しません', true);
+          return false;
+        }
+
+        const isUpdate = !!payloadData.id;
+        const recordId = payloadData.id || Utils.generateId();
+        
+        const payload = { 
+          action: isUpdate ? 'update' : 'insert',
+          id: recordId,
+          table: table,
+          cycle_id: table === 'cycles' ? undefined : activeCycle.id,
+          ...payloadData
+        };
+
+        // UI先行更新用データの構築
+        const localData = { ...payload };
+        if(table === 'daily_records' && !localData.lh_result) localData.lh_result = '';
+        
+        const s = Store.get();
+        let targetArrayKey = table === 'daily_records' ? 'daily' : table === 'clinic_visits' ? 'clinic' : table === 'iui_events' ? 'iui' : 'cycles';
+        let newArray = [...s[targetArrayKey]];
+        
+        if (isUpdate) {
+          const idx = newArray.findIndex(item => item.id === recordId);
+          if(idx !== -1) newArray[idx] = localData;
+        } else {
+          newArray.push(localData);
+        }
+        
+        // 周期データの場合は開始日順にソート
+        if (table === 'cycles') {
+          newArray.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+        }
+        
+        // 即座にStateを更新し、モーダルを閉じる
+        Store.set({ [targetArrayKey]: newArray });
+        if(table === 'cycles') Store.set({ activeCycle: newArray[newArray.length - 1] });
+        
+        App.closeModal();
+        Utils.showToast('保存しました');
+
+        // バックグラウンドでAPI送信
+        try {
+          fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
+            .then(res => res.json())
+            .then(res => { if(res.status !== 'success') throw new Error(); })
+            .catch(() => Utils.showToast('クラウドへの保存に失敗しました', true));
+        } catch(e) {}
+        
+        return true;
+      }
+    };
+
+    // --- 4. UI Rendering (Views) ---
+    const Views = {
+      home: () => {
+        const { activeCycle, daily, clinic, iui, settings } = Store.get();
+        
+        const headerHtml = `
+          <div class="flex justify-between items-center mb-6 mt-4">
+            <div>
+              <div class="text-xs text-sub mb-1 font-medium">${Utils.toLocalYYYYMMDD(new Date()).replace(/-/g, '/')}</div>
+              <h1 class="text-2xl font-serif tracking-wider text-main">IUIスケジュール</h1>
+            </div>
+            <div class="text-3xl bg-primary-light w-10 h-10 rounded-full flex items-center justify-center">🌸</div>
+          </div>
+        `;
+
+        if (!activeCycle) {
+          return headerHtml + `
+            <div class="bg-card rounded-[20px] p-6 shadow-sm border border-border/30 text-center">
+              <p class="text-sub mb-4">現在アクティブな周期がありません</p>
+              <button onclick="App.openModal('new-cycle')" class="bg-primary text-white w-full py-3 rounded-xl font-bold">新しい周期を登録</button>
+            </div>
+          `;
+        }
+
+        const today = Utils.getTodayStr();
+        const startD = activeCycle.start_date;
+        const diffDays = Math.floor((new Date(today) - new Date(startD)) / 86400000) + 1;
+        
+        const latestIUI = iui[iui.length - 1];
+        const iuiDate = latestIUI?.planned_date ? new Date(latestIUI.planned_date) : null;
+        const abstainDate = iuiDate ? Utils.addDays(iuiDate, -settings.abstainDays) : null;
+        const periodDate = Utils.addDays(startD, settings.cycleLen);
+
+        const hasTodayDaily = daily.some(d => Utils.toLocalYYYYMMDD(d.date) === today && d.temperature);
+        const taskHtml = hasTodayDaily 
+          ? `<div class="flex items-center text-[15px]"><span class="mr-3 text-lg">✅</span><span class="text-sub">今日の記録は完了しています</span></div>`
+          : `<div class="flex items-center text-[15px]"><div class="w-2 h-2 rounded-full bg-primary mr-3"></div><span class="font-medium">基礎体温を記録しましょう</span></div>`;
+
+        return headerHtml + `
+          <!-- Dashboard Card -->
+          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6">
+            <div class="flex justify-between items-center mb-5">
+              <span class="px-3 py-1 bg-primary-light text-[#B07B7B] text-xs font-bold rounded-lg">${activeCycle.status}</span>
+              <span class="text-sm text-sub font-medium">周期 ${diffDays}日目</span>
+            </div>
+            <div class="grid grid-cols-2 gap-y-5 gap-x-6">
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(予定)</span><span class="text-lg font-bold">${Utils.formatMMDD(iuiDate)}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">禁欲開始日</span><span class="text-lg font-bold">${Utils.formatMMDD(abstainDate)}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${Utils.formatMMDD(periodDate)}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+            </div>
+          </div>
+
+          <!-- Tasks -->
+          <h2 class="text-sm font-bold text-main mb-3 ml-1">サポートタスク</h2>
+          <div class="bg-card rounded-[16px] p-4 shadow-sm border border-border/20 mb-6 cursor-pointer active:scale-[0.98] transition-transform" onclick="${!hasTodayDaily ? "App.openModal('daily')" : ""}">
+            ${taskHtml}
+          </div>
+
+          <!-- Quick Actions -->
+          <h2 class="text-sm font-bold text-main mb-3 ml-1">クイック記録</h2>
+          <div class="grid grid-cols-2 gap-3 mb-8">
+            <button onclick="App.openModal('daily')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-2"><span class="text-lg">🌡</span><span class="text-[13px] font-bold">基礎体温</span></div>
+              <span class="text-gray-300">›</span>
+            </button>
+            <button onclick="App.openModal('clinic')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-2"><span class="text-lg">🩺</span><span class="text-[13px] font-bold">通院記録</span></div>
+              <span class="text-gray-300">›</span>
+            </button>
+            <button onclick="App.openModal('meds')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-2"><span class="text-lg">💊</span><span class="text-[13px] font-bold">薬・注射</span></div>
+              <span class="text-gray-300">›</span>
+            </button>
+            <button onclick="App.openModal('iui')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-2"><span class="text-lg">♡</span><span class="text-[13px] font-bold">IUI管理</span></div>
+              <span class="text-gray-300">›</span>
+            </button>
+          </div>
+          
+          <div class="bg-primary-light rounded-xl p-4 text-center text-[13px] text-[#8A6565] italic">
+            妻のサポート、今日もお疲れ様です。
+          </div>
+        `;
+      },
+
+      calendar: () => {
+        const { calMonth, daily, clinic } = Store.get();
+        const year = calMonth.getFullYear();
+        const month = calMonth.getMonth();
+        
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        
+        const recordDates = new Set([...daily, ...clinic].map(r => Utils.toLocalYYYYMMDD(r.date || r.visit_date)));
+        const todayStr = Utils.getTodayStr();
+
+        let cells = '';
+        for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
+        for (let i = 1; i <= lastDay; i++) {
+          const dStr = Utils.toLocalYYYYMMDD(new Date(year, month, i));
+          const isToday = dStr === todayStr;
+          const hasRec = recordDates.has(dStr);
+          
+          cells += `
+            <div class="aspect-square flex flex-col items-center justify-center rounded-full relative cursor-pointer active:bg-gray-100 transition-colors ${isToday ? 'border border-primary font-bold' : ''}" 
+                 onclick="App.selectDate('${dStr}')" id="cal-cell-${dStr}">
+              <span class="text-[15px]">${i}</span>
+              ${hasRec ? `<div class="w-1 h-1 bg-primary rounded-full absolute bottom-1"></div>` : ''}
+            </div>
+          `;
+        }
+
+        return `
+          <div class="mt-4 mb-6">
+            <h1 class="text-2xl font-serif tracking-wider text-main text-center">カレンダー</h1>
+          </div>
+          <div class="bg-card rounded-[24px] p-5 shadow-sm border border-border/20">
+            <div class="flex justify-between items-center mb-4 px-2">
+              <button onclick="App.changeMonth(-1)" class="p-2 text-xl text-sub hover:text-main transition-colors">‹</button>
+              <div class="font-bold text-lg">${year}年${month + 1}月</div>
+              <button onclick="App.changeMonth(1)" class="p-2 text-xl text-sub hover:text-main transition-colors">›</button>
+            </div>
+            <div class="grid grid-cols-7 text-center mb-2 text-xs font-bold text-sub">
+              <div class="text-red-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
+            </div>
+            <div class="grid grid-cols-7 text-center gap-1">
+              ${cells}
+            </div>
+          </div>
+          <div id="cal-detail-area" class="mt-6">
+            <p class="text-center text-sub text-sm mt-10">日付をタップして記録を確認</p>
+          </div>
+        `;
+      },
+
+      records: () => {
+        const { daily, clinic } = Store.get();
+        const all = [...daily.map(d => ({...d, type: 'daily'})), ...clinic.map(c => ({...c, type: 'clinic', date: c.visit_date}))];
+        all.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        let listHtml = all.map(r => `
+          <div class="bg-card rounded-[16px] p-4 mb-3 shadow-sm border border-border/20 flex justify-between items-center active:bg-gray-50 transition-colors cursor-pointer"
+               onclick="App.openModal('${r.type}', '${r.id}')">
+            <div>
+              <div class="font-bold text-[15px] mb-1">${Utils.toLocalYYYYMMDD(r.date)}</div>
+              <div class="text-[13px] text-sub">
+                ${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}
+              </div>
+            </div>
+            <div class="text-gray-300 text-xl">›</div>
+          </div>
+        `).join('');
+        
+        if(!listHtml) listHtml = '<p class="text-center text-sub mt-10 text-sm">記録がありません</p>';
+
+        return `
+          <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">記録一覧</h1></div>
+          <div class="pb-4">${listHtml}</div>
+        `;
+      },
+
+      cycles: () => {
+        const { cycles } = Store.get();
+        let listHtml = cycles.slice().reverse().map(c => {
+          const sD = new Date(c.start_date);
+          return `
+            <div class="bg-card rounded-[16px] p-4 mb-3 shadow-sm border border-border/20 flex justify-between items-center active:bg-gray-50 transition-colors cursor-pointer"
+                 onclick="App.openModal('new-cycle', '${c.id}')">
+              <div>
+                <div class="flex gap-2 items-center mb-1">
+                  <span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] text-sub font-bold">${c.status}</span>
+                  <span class="text-[11px] text-sub">${c.type || '未設定'}</span>
+                </div>
+                <div class="font-bold text-[16px]">${Utils.toLocalYYYYMMDD(sD)} 〜</div>
+              </div>
+              <div class="text-gray-300 text-xl">›</div>
+            </div>
+          `;
+        }).join('');
+        
+        if(!listHtml) listHtml = '<p class="text-center text-sub mt-10 text-sm">周期データがありません</p>';
+
+        return `
+          <div class="mt-4 mb-6 flex justify-between items-center">
+            <h1 class="text-2xl font-serif tracking-wider">周期一覧</h1>
+            <button onclick="App.openModal('new-cycle')" class="bg-primary text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-sm">＋ 新規</button>
+          </div>
+          <div>${listHtml}</div>
+        `;
+      },
+
+      settings: () => {
+        const { settings } = Store.get();
+        return `
+          <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">設定</h1></div>
+          
+          <h2 class="text-sm font-bold text-main mb-3 ml-1">周期設定</h2>
+          <div class="bg-card rounded-[20px] p-5 shadow-sm border border-border/20 mb-6">
+            <div class="mb-4">
+              <label class="block text-[13px] text-main mb-2">平均周期日数</label>
+              <select id="set-cycle-len" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none" onchange="App.updateSettings('cycleLen', this.value)">
+                <option value="28" ${settings.cycleLen==28?'selected':''}>28日</option>
+                <option value="31" ${settings.cycleLen==31?'selected':''}>31日</option>
+                <option value="35" ${settings.cycleLen==35?'selected':''}>35日</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[13px] text-main mb-2">禁欲推奨日数</label>
+              <select id="set-abstinence" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none" onchange="App.updateSettings('abstainDays', this.value)">
+                <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option>
+                <option value="2" ${settings.abstainDays==2?'selected':''}>2日</option>
+                <option value="3" ${settings.abstainDays==3?'selected':''}>3日</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="mt-12 text-center text-[10px] text-gray-300">
+            <p>Developed for Shogo & 🐈 Hotate, Uni</p>
+            <p class="mt-1">v2.1 State-driven Arch</p>
+          </div>
+        `;
+      }
+    };
+
+    // --- 5. Modal Forms Definitions ---
+    const Forms = {
+      daily: (id) => {
+        const r = Store.get().daily.find(x => x.id === id) || {};
+        return `
+          <div class="mb-4">
+            <label class="block text-[13px] font-bold mb-1">日付</label>
+            <input type="date" id="form-date" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : Utils.getTodayStr()}" onchange="App.checkExistingDaily(this.value)">
+          </div>
+          <div class="mb-6">
+            <label class="block text-[13px] font-bold mb-1">基礎体温 (°C)</label>
+            <input type="number" id="form-temp" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
+          </div>
+          <input type="hidden" id="form-id" value="${r.id || ''}">
+          <button onclick="App.submitForm('daily')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+        `;
+      },
+      clinic: (id) => {
+        const r = Store.get().clinic.find(x => x.id === id) || {};
+        return `
+          <div class="mb-4">
+            <label class="block text-[13px] font-bold mb-1">受診日</label>
+            <input type="date" id="form-date" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : Utils.getTodayStr()}">
+          </div>
+          <div class="mb-6">
+            <label class="block text-[13px] font-bold mb-1">次回受診の指示日</label>
+            <input type="date" id="form-next" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.next_visit_date ? Utils.toLocalYYYYMMDD(r.next_visit_date) : ''}">
+          </div>
+          <input type="hidden" id="form-id" value="${r.id || ''}">
+          <button onclick="App.submitForm('clinic')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+        `;
+      },
+      iui: (id) => {
+        const r = Store.get().iui.find(x => x.id === id) || {};
+        return `
+          <div class="mb-6">
+            <label class="block text-[13px] font-bold mb-1">人工授精(IUI) 予定日</label>
+            <input type="date" id="form-planned" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.planned_date ? Utils.toLocalYYYYMMDD(r.planned_date) : Utils.getTodayStr()}">
+          </div>
+          <input type="hidden" id="form-id" value="${r.id || ''}">
+          <button onclick="App.submitForm('iui')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+        `;
+      },
+      'new-cycle': (id) => {
+        const r = Store.get().cycles.find(x => x.id === id) || {};
+        return `
+          <div class="mb-4">
+            <label class="block text-[13px] font-bold mb-1">生理開始日</label>
+            <input type="date" id="form-date" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : Utils.getTodayStr()}">
+          </div>
+          <div class="mb-4">
+            <label class="block text-[13px] font-bold mb-1">周期タイプ</label>
+            <select id="form-type" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
+              <option value="人工授精周期" ${r.type==='人工授精周期'?'selected':''}>人工授精周期</option>
+              <option value="排卵誘発周期" ${r.type==='排卵誘発周期'?'selected':''}>排卵誘発周期</option>
+              <option value="自然周期" ${r.type==='自然周期'?'selected':''}>自然周期</option>
+            </select>
+          </div>
+          <div class="mb-6">
+            <label class="block text-[13px] font-bold mb-1">ステータス</label>
+            <select id="form-status" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
+              <option value="進行中" ${r.status==='進行中'?'selected':''}>進行中</option>
+              <option value="周期終了" ${r.status==='周期終了'?'selected':''}>周期終了</option>
+            </select>
+          </div>
+          <input type="hidden" id="form-id" value="${r.id || ''}">
+          <button onclick="App.submitForm('cycles')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">周期を保存</button>
+        `;
+      },
+      meds: () => `<div class="text-center text-sub py-10 font-bold">機能準備中</div>`
+    };
+
+    const FormTitles = { daily: '日次記録', clinic: '通院記録', iui: 'IUI予定', 'new-cycle': '周期の登録・編集', meds: '薬・注射' };
+
+    // --- 6. Main Application Logic ---
+    const App = {
+      async init() {
+        document.getElementById('global-loading').classList.remove('hidden');
+        await API.fetchAll();
+        
+        // Auto-select today in calendar on load
+        setTimeout(() => {
+          if(Store.get().currentView === 'home') this.render();
+          document.getElementById('global-loading').classList.add('hidden');
+        }, 300);
+      },
+
+      render() {
+        const { currentView } = Store.get();
+        const content = document.getElementById('app-content');
+        
+        // Render current view
+        content.innerHTML = Views[currentView] ? Views[currentView]() : '';
+        content.classList.remove('hidden');
+
+        // Update nav UI
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          if(btn.dataset.target === currentView) {
+            btn.classList.add('text-primary');
+            btn.classList.remove('text-sub');
+          } else {
+            btn.classList.remove('text-primary');
+            btn.classList.add('text-sub');
+          }
+        });
+      },
+
+      navigate(view) {
+        Store.set({ currentView: view });
+        window.scrollTo(0,0);
+      },
+
+      // Modal Logic
+      openModal(type, id = null) {
+        document.getElementById('modal-title').innerText = FormTitles[type];
+        document.getElementById('modal-body').innerHTML = Forms[type](id);
+        
+        const overlay = document.getElementById('modal-overlay');
+        const sheet = document.getElementById('modal-sheet');
+        
+        overlay.classList.remove('hidden');
+        // trigger reflow
+        void overlay.offsetWidth;
+        overlay.classList.remove('opacity-0');
+        overlay.classList.add('opacity-100');
+        
+        sheet.classList.remove('closed');
+        sheet.classList.add('open');
+      },
+
+      closeModal() {
+        const overlay = document.getElementById('modal-overlay');
+        const sheet = document.getElementById('modal-sheet');
+        
+        sheet.classList.remove('open');
+        sheet.classList.add('closed');
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0');
+        
+        setTimeout(() => { overlay.classList.add('hidden'); }, 300);
+      },
+
+      // Form Handling
+      checkExistingDaily(dateStr) {
+        const r = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === dateStr);
+        document.getElementById('form-id').value = r ? r.id : '';
+        document.getElementById('form-temp').value = r ? (r.temperature || '') : '';
+      },
+
+      submitForm(table) {
+        const id = document.getElementById('form-id')?.value;
+        const payload = { id };
+
+        if (table === 'daily') {
+          payload.date = document.getElementById('form-date').value;
+          payload.temperature = document.getElementById('form-temp').value;
+        } else if (table === 'clinic') {
+          payload.visit_date = document.getElementById('form-date').value;
+          payload.next_visit_date = document.getElementById('form-next').value;
+        } else if (table === 'iui') {
+          payload.planned_date = document.getElementById('form-planned').value;
+        } else if (table === 'cycles') {
+          payload.start_date = document.getElementById('form-date').value;
+          payload.type = document.getElementById('form-type').value;
+          payload.status = document.getElementById('form-status').value;
+        }
+
+        API.save(table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles', payload);
+      },
+
+      // Feature specific logic
+      changeMonth(delta) {
+        const d = Store.get().calMonth;
+        d.setMonth(d.getMonth() + delta);
+        Store.set({ calMonth: d });
+      },
+
+      selectDate(dStr) {
+        // UI Selection visual update without full re-render
+        document.querySelectorAll('[id^="cal-cell-"]').forEach(el => {
+          el.classList.remove('bg-primary', 'text-white');
+          const dot = el.querySelector('.bg-white');
+          if(dot) dot.classList.replace('bg-white', 'bg-primary');
+        });
+        
+        const targetEl = document.getElementById(`cal-cell-${dStr}`);
+        if(targetEl) {
+          targetEl.classList.add('bg-primary', 'text-white');
+          const dot = targetEl.querySelector('.bg-primary');
+          if(dot && targetEl.classList.contains('bg-primary')) dot.classList.replace('bg-primary', 'bg-white');
+        }
+
+        // Build detail content
+        const { daily, clinic } = Store.get();
+        const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
+        const cRec = clinic.find(r => Utils.toLocalYYYYMMDD(r.visit_date) === dStr);
+        
+        let content = '';
+        if(dRec) content += `<div class="mb-1">🌡 体温: <span class="font-bold">${dRec.temperature || '-'}</span> °C</div>`;
+        if(cRec) content += `<div>🏥 受診記録あり</div>`;
+        
+        const actionHtml = `<button class="w-full mt-4 py-3 rounded-xl border border-primary text-primary font-bold text-sm" onclick="App.openModal('daily', '${dRec?dRec.id:''}')">日次記録を入力・編集</button>`;
+
+        document.getElementById('cal-detail-area').innerHTML = `
+          <div class="text-sm font-bold text-sub mb-3">${dStr.replace(/-/g, '/')}</div>
+          ${content ? `<div class="bg-card p-4 rounded-[16px] shadow-sm border border-border/20">${content}${actionHtml}</div>` : `<div class="text-sub text-sm">記録なし${actionHtml}</div>`}
+        `;
+        
+        // Modal連携のため一時的に選択日をセット
+        setTimeout(() => {
+          const dateInput = document.getElementById('form-date');
+          if(dateInput && !document.getElementById('modal-sheet').classList.contains('open')) {
+            dateInput.value = dStr;
+          }
+        }, 10);
+      },
+
+      updateSettings(key, val) {
+        const s = Store.get().settings;
+        s[key] = parseInt(val, 10);
+        Store.set({ settings: s });
+      }
+    };
+
+    // --- 7. Boot ---
+    window.onload = () => App.init();
   </script>
 </body>
 </html>
