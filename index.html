@@ -108,6 +108,7 @@
     const Store = {
       state: {
         currentView: 'home',
+        dashTab: 'current',
         cycles: [],
         daily: [],
         clinic: [],
@@ -135,6 +136,14 @@
           const activeCycle = cycles.length > 0 ? cycles[cycles.length - 1] : null;
           
           Store.set({ cycles, daily, clinic, iui, activeCycle });
+
+          // ローカルストレージに設定がない場合、過去の実績から平均を算出して自動適用
+          if (!localStorage.getItem('iui_settings')) {
+            const stats = App.getCycleStats();
+            if (stats.count > 0) {
+              App.updateSettings('cycleLen', stats.avg);
+            }
+          }
         } catch (e) {
           Utils.showToast('データ同期に失敗しました', true);
         }
@@ -205,7 +214,7 @@
 
     const Views = {
       home: () => {
-        const { activeCycle, daily, iui, settings } = Store.get();
+        const { activeCycle, daily, dashTab } = Store.get();
         
         const headerHtml = `
           <div class="flex justify-between items-center mb-6 mt-4">
@@ -228,27 +237,50 @@
 
         const cycleDaily = daily.filter(d => d.cycle_id === activeCycle.id);
         const today = Utils.getTodayStr();
-        const diffDays = Math.floor((new Date(today) - new Date(activeCycle.start_date)) / 86400000) + 1;
+        const startD = activeCycle.start_date;
+        const diffDays = Math.floor((new Date(today) - new Date(startD)) / 86400000) + 1;
         
         const preds = App.getPredictions();
         
+        const tabCurrentClass = dashTab === 'current' ? 'text-primary border-primary' : 'text-sub border-transparent';
+        const tabNextClass = dashTab === 'next' ? 'text-primary border-primary' : 'text-sub border-transparent';
+
+        const tabsHtml = `
+          <div class="flex border-b border-border/50 mb-5">
+            <button class="flex-1 pb-2 text-[13px] font-bold ${tabCurrentClass} border-b-2 transition-colors" onclick="App.switchDashTab('current')">今回周期</button>
+            <button class="flex-1 pb-2 text-[13px] font-bold ${tabNextClass} border-b-2 transition-colors" onclick="App.switchDashTab('next')">次周期(予測)</button>
+          </div>
+        `;
+
         let dashGridHtml = '';
-        if (preds.isIUIDone) {
-          const passedDays = Math.floor((new Date(today) - new Date(preds.actual)) / 86400000);
-          dashGridHtml = `
-            <div class="grid grid-cols-2 gap-y-5 gap-x-6">
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(済)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI後経過</span><span class="text-lg font-bold">${passedDays}<span class="text-[12px] font-normal text-sub ml-1">日目</span></span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">妊娠判定目安</span><span class="text-lg font-bold">${preds.test ? Utils.formatMMDD(new Date(preds.test)) : '-'}</span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
-            </div>
-          `;
+        if (dashTab === 'current') {
+          if (preds.isIUIDone) {
+            const passedDays = Math.floor((new Date(today) - new Date(preds.actual)) / 86400000);
+            dashGridHtml = `
+              <div class="grid grid-cols-2 gap-y-5 gap-x-6">
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(済)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI後経過</span><span class="text-lg font-bold">${passedDays}<span class="text-[12px] font-normal text-sub ml-1">日目</span></span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+              </div>
+            `;
+          } else {
+            dashGridHtml = `
+              <div class="grid grid-cols-2 gap-y-5 gap-x-6">
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(予定)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">禁欲開始日</span><span class="text-lg font-bold">${preds.abstain ? Utils.formatMMDD(new Date(preds.abstain)) : '-'}</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+              </div>
+            `;
+          }
         } else {
           dashGridHtml = `
             <div class="grid grid-cols-2 gap-y-5 gap-x-6">
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(予定)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">禁欲開始日</span><span class="text-lg font-bold">${preds.abstain ? Utils.formatMMDD(new Date(preds.abstain)) : '-'}</span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次周期 生理予定</span><span class="text-lg font-bold">${preds.nextPeriod ? Utils.formatMMDD(new Date(preds.nextPeriod)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次周期 IUI目安</span><span class="text-lg font-bold">${preds.nextIui ? Utils.formatMMDD(new Date(preds.nextIui)) : '-'}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次周期 禁欲開始</span><span class="text-lg font-bold">${preds.nextAbstain ? Utils.formatMMDD(new Date(preds.nextAbstain)) : '-'}</span></div>
+            </div>
+            <div class="mt-5 p-3 bg-gray-50 rounded-xl text-[11px] text-sub leading-relaxed">
+              ※今回の周期で妊娠が成立しなかった場合の参考スケジュールです。<br>IUI目安は今周期の実績日数を基に算出しています。
             </div>
           `;
         }
@@ -272,10 +304,11 @@
 
         return headerHtml + `
           <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6">
-            <div class="flex justify-between items-center mb-5">
+            <div class="flex justify-between items-center mb-3">
               <span class="px-3 py-1 bg-primary-light text-[#B07B7B] text-xs font-bold rounded-lg">${activeCycle.status}</span>
               <span class="text-sm text-sub font-medium">周期 ${diffDays}日目</span>
             </div>
+            ${tabsHtml}
             ${dashGridHtml}
           </div>
           <h2 class="text-sm font-bold text-main mb-3 ml-1">サポートタスク</h2>
@@ -320,10 +353,14 @@
           const hasRec = recordDates.has(dStr);
           
           let eventsHtml = '';
+          // 現在の周期
           if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
           if (dStr === preds.abstain) eventsHtml += '<span class="text-[10px]">🕊</span>';
           if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
-          if (dStr === preds.test) eventsHtml += '<span class="text-[10px]">👶</span>';
+          
+          // 次周期予測
+          if (dStr === preds.nextIui && dStr !== preds.iui) eventsHtml += '<span class="text-[10px] opacity-40">🌸</span>';
+          if (dStr === preds.nextAbstain && dStr !== preds.abstain) eventsHtml += '<span class="text-[10px] opacity-40">🕊</span>';
 
           cells += `
             <div class="aspect-square flex flex-col items-center pt-1 rounded-xl relative cursor-pointer active:bg-gray-100 transition-colors ${isToday ? 'border border-primary bg-primary-light/30' : ''}" 
@@ -378,6 +415,12 @@
               <h2 class="text-sm font-bold text-main">基礎体温グラフ</h2>
               <span class="text-xs text-sub">最新周期</span>
             </div>
+            
+            <!-- Graph Legend -->
+            <div class="flex gap-4 justify-center mb-4 text-[10px] text-sub">
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rotate-45 bg-[#F4A4A4]"></span>IUI</div>
+            </div>
+            
             <div class="w-full h-[200px] relative">
               <canvas id="tempChart"></canvas>
             </div>
@@ -459,7 +502,7 @@
               </select>
             </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v2.8 Save Settings</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.0 Next Cycle & Graph Events</p></div>
         `;
       }
     };
@@ -596,7 +639,7 @@
         const canvas = document.getElementById('tempChart');
         if (!canvas) return;
 
-        const { activeCycle, daily } = Store.get();
+        const { activeCycle, daily, clinic } = Store.get();
         if (!activeCycle) return;
 
         const cycleDaily = daily
@@ -605,8 +648,35 @@
 
         if (cycleDaily.length === 0) return;
 
-        const labels = cycleDaily.map(d => Utils.formatMMDD(new Date(d.date)));
-        const data = cycleDaily.map(d => parseFloat(d.temperature));
+        const preds = App.getPredictions();
+        const activeStartStr = Utils.toLocalYYYYMMDD(activeCycle.start_date);
+
+        const labels = [];
+        const data = [];
+        const pointColors = [];
+        const pointRadii = [];
+        const pointStyles = [];
+
+        cycleDaily.forEach(d => {
+          const dStr = Utils.toLocalYYYYMMDD(d.date);
+          labels.push(Utils.formatMMDD(new Date(d.date)));
+          data.push(parseFloat(d.temperature));
+
+          let color = '#D4A5A5';
+          let radius = 4;
+          let style = 'circle';
+
+          if (dStr === preds.actual || dStr === preds.iui) {
+            // IUIのみをハイライト
+            color = '#F4A4A4';
+            radius = 8;
+            style = 'rectRot';
+          }
+
+          pointColors.push(color);
+          pointRadii.push(radius);
+          pointStyles.push(style);
+        });
 
         if (this.chartInstance) {
           this.chartInstance.destroy();
@@ -623,8 +693,10 @@
               borderColor: '#D4A5A5',
               backgroundColor: 'rgba(212, 165, 165, 0.2)',
               borderWidth: 2,
-              pointBackgroundColor: '#D4A5A5',
-              pointRadius: 4,
+              pointBackgroundColor: pointColors,
+              pointBorderColor: pointColors,
+              pointRadius: pointRadii,
+              pointStyle: pointStyles,
               tension: 0.3,
               spanGaps: true
             }]
@@ -653,6 +725,8 @@
       },
 
       navigate(view) { Store.set({ currentView: view }); window.scrollTo(0,0); },
+      
+      switchDashTab(tab) { Store.set({ dashTab: tab }); },
 
       openModal(type, id = null) {
         document.getElementById('modal-title').innerText = FormTitles[type];
@@ -738,13 +812,14 @@
 
       getPredictions() {
         const { activeCycle, iui, settings } = Store.get();
-        let preds = { iui: null, abstain: null, period: null, test: null, isIUIDone: false, actual: null };
+        let preds = { iui: null, abstain: null, period: null, isIUIDone: false, actual: null, nextPeriod: null, nextIui: null, nextAbstain: null };
         if (!activeCycle) return preds;
         
         const cycleIUI = iui.filter(i => i.cycle_id === activeCycle.id);
         const latestIUI = cycleIUI[cycleIUI.length - 1];
         
-        preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(activeCycle.start_date, settings.cycleLen));
+        const startD = activeCycle.start_date;
+        preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(startD, settings.cycleLen));
         
         if (latestIUI) {
           preds.isIUIDone = !!latestIUI.actual_date;
@@ -754,9 +829,24 @@
           }
           if (preds.isIUIDone) {
             preds.actual = Utils.toLocalYYYYMMDD(latestIUI.actual_date);
-            preds.test = Utils.toLocalYYYYMMDD(Utils.addDays(latestIUI.actual_date, 14));
           }
         }
+        
+        // 次周期の予測計算
+        if (preds.period) {
+          preds.nextPeriod = preds.period;
+          let iuiCycleDays = 14; 
+          if (preds.actual || preds.iui) {
+            const targetIuiDate = new Date(preds.actual || preds.iui);
+            iuiCycleDays = Math.floor((targetIuiDate - new Date(startD)) / 86400000);
+          }
+          const nextIuiObj = Utils.addDays(new Date(preds.nextPeriod), iuiCycleDays);
+          if (nextIuiObj) {
+            preds.nextIui = Utils.toLocalYYYYMMDD(nextIuiObj);
+            preds.nextAbstain = Utils.toLocalYYYYMMDD(Utils.addDays(nextIuiObj, -settings.abstainDays));
+          }
+        }
+        
         return preds;
       },
 
@@ -782,10 +872,15 @@
 
         const preds = App.getPredictions();
         let eventContent = '';
+        
+        // 今周期
         if (dStr === preds.iui) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#B07B7B]">🌸 IUI実施予定日</div>`;
         if (dStr === preds.abstain) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#8A6565]">🕊 禁欲開始日</div>`;
         if (dStr === preds.period) eventContent += `<div class="mb-1 text-[13px] font-bold text-red-400">🩸 次回生理予定日</div>`;
-        if (dStr === preds.test) eventContent += `<div class="mb-1 text-[13px] font-bold text-blue-400">👶 妊娠判定目安</div>`;
+        
+        // 次周期
+        if (dStr === preds.nextIui && dStr !== preds.iui) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#B07B7B]/70">🌸 次周期 IUI目安</div>`;
+        if (dStr === preds.nextAbstain && dStr !== preds.abstain) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#8A6565]/70">🕊 次周期 禁欲開始</div>`;
 
         const { daily, clinic } = Store.get();
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
