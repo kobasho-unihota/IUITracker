@@ -9,6 +9,9 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for Graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -32,72 +35,47 @@
   </script>
   
   <style>
-    /* 最小限のカスタムCSS (スクロールバー非表示、タップハイライト無効化など) */
     html, body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; background-color: #FDFBFB; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    /* ボトムシートのアニメーション */
     .bottom-sheet { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
     .bottom-sheet.open { transform: translateY(0); }
     .bottom-sheet.closed { transform: translateY(100%); }
-    
-    /* フェードアニメーション */
     .fade-in { animation: fadeIn 0.2s ease-in forwards; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body class="text-main font-sans antialiased pb-[90px]">
 
-  <!-- グローバルローディング (初回のみ) -->
   <div id="global-loading" class="fixed inset-0 bg-white/90 z-[100] flex flex-col items-center justify-center fade-in">
     <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mb-4"></div>
     <div class="text-primary font-bold text-sm tracking-widest">LOADING...</div>
   </div>
 
-  <!-- トースト通知 (非同期保存の結果表示など) -->
-  <div id="toast" class="fixed top-12 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg"></div>
+  <div id="toast" class="fixed top-12 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg whitespace-nowrap"></div>
 
-  <!-- === メインビューコンテナ === -->
-  <main id="app-content" class="w-full min-h-screen px-4 pt-safe-top pb-safe-bottom hidden fade-in">
-    <!-- 各画面はJavaScriptで動的にここにレンダリングされます -->
-  </main>
+  <main id="app-content" class="w-full min-h-screen px-4 pt-safe-top pb-safe-bottom hidden fade-in"></main>
 
-  <!-- === ボトムシート (各種入力フォーム) === -->
   <div id="modal-overlay" class="fixed inset-0 bg-black/30 z-40 hidden transition-opacity opacity-0" onclick="App.closeModal()"></div>
   <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-bg rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] max-h-[90vh] overflow-y-auto no-scrollbar pb-safe-bottom flex flex-col">
     <div class="sticky top-0 bg-bg/95 backdrop-blur z-10 px-6 py-4 flex justify-between items-center border-b border-border/50">
       <h3 id="modal-title" class="text-lg font-bold">タイトル</h3>
       <button onclick="App.closeModal()" class="text-sub p-2 -mr-2 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
     </div>
-    <div id="modal-body" class="p-6">
-      <!-- フォームの中身が動的に入る -->
-    </div>
+    <div id="modal-body" class="p-6"></div>
   </div>
 
-  <!-- === ボトムナビゲーション === -->
   <nav class="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-border z-30 pb-safe-bottom">
     <div class="flex justify-around items-center h-[70px] px-2" id="nav-container">
-      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="home">
-        <span class="text-2xl mb-0.5">🏠</span>ホーム
-      </button>
-      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="calendar">
-        <span class="text-2xl mb-0.5">📅</span>カレンダー
-      </button>
-      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="records">
-        <span class="text-2xl mb-0.5">✏️</span>記録
-      </button>
-      <button onclick="App.navigate('cycles')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="cycles">
-        <span class="text-2xl mb-0.5">🔄</span>周期
-      </button>
-      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="settings">
-        <span class="text-2xl mb-0.5">⚙️</span>設定
-      </button>
+      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="home"><span class="text-2xl mb-0.5">🏠</span>ホーム</button>
+      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="calendar"><span class="text-2xl mb-0.5">📅</span>カレンダー</button>
+      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="records"><span class="text-2xl mb-0.5">✏️</span>記録</button>
+      <button onclick="App.navigate('cycles')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="cycles"><span class="text-2xl mb-0.5">🔄</span>周期</button>
+      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-colors" data-target="settings"><span class="text-2xl mb-0.5">⚙️</span>設定</button>
     </div>
   </nav>
 
   <script>
-    // --- 1. Constants & Utilities ---
     const API_URL = 'https://script.google.com/macros/s/AKfycbxHyWLD6EKwNQUHuBfvy0M7Cf636iFou4E6ndgtb0sfc8lKfAGPvmRUoPKMRbb1A_5WxA/exec';
     
     const Utils = {
@@ -127,7 +105,6 @@
       }
     };
 
-    // --- 2. State Management (Store) ---
     const Store = {
       state: {
         currentView: 'home',
@@ -137,16 +114,15 @@
         iui: [],
         activeCycle: null,
         calMonth: new Date(),
-        settings: { cycleLen: 31, abstainDays: 2 }
+        settings: JSON.parse(localStorage.getItem('iui_settings')) || { cycleLen: 31, abstainDays: 2 }
       },
       set(updates) {
         this.state = { ...this.state, ...updates };
-        App.render(); // 状態が変わるたびにUIを再描画
+        App.render();
       },
       get() { return this.state; }
     };
 
-    // --- 3. API Communication ---
     const API = {
       async fetchAll() {
         try {
@@ -155,45 +131,43 @@
             fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events')
           ]);
           
-          // 周期を開始日順でソート（過去日の登録に対応）
           cycles.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+          const activeCycle = cycles.length > 0 ? cycles[cycles.length - 1] : null;
           
-          let activeCycle = null;
-          let filteredDaily = [], filteredClinic = [], filteredIUI = [];
-          
-          if (cycles.length > 0) {
-            activeCycle = cycles[cycles.length - 1]; // 開始日が最新のものをアクティブとする
-            filteredDaily = daily.filter(d => d.cycle_id === activeCycle.id);
-            filteredClinic = clinic.filter(c => c.cycle_id === activeCycle.id);
-            filteredIUI = iui.filter(i => i.cycle_id === activeCycle.id);
-          }
-          
-          Store.set({ cycles, daily: filteredDaily, clinic: filteredClinic, iui: filteredIUI, activeCycle });
+          Store.set({ cycles, daily, clinic, iui, activeCycle });
         } catch (e) {
           Utils.showToast('データ同期に失敗しました', true);
-          console.error(e);
         }
       },
-      // Optimistic UI アプローチ: UIを即座に更新し、裏でAPIを叩く
       async save(table, payloadData) {
-        const { activeCycle } = Store.get();
-        if (table !== 'cycles' && !activeCycle) {
-          Utils.showToast('周期が存在しません', true);
+        const { cycles } = Store.get();
+        if (cycles.length === 0 && table !== 'cycles') {
+          Utils.showToast('先に周期を登録してください', true);
           return false;
         }
 
         const isUpdate = !!payloadData.id;
         const recordId = payloadData.id || Utils.generateId();
         
+        let cycleId = undefined;
+        if (table !== 'cycles') {
+          const targetDate = payloadData.date || payloadData.visit_date || payloadData.planned_date || Utils.getTodayStr();
+          const targetCycle = App.getCycleForDate(targetDate);
+          if (!targetCycle) {
+            Utils.showToast('対象日付以前の周期がありません。先に周期を追加してください。', true);
+            return false;
+          }
+          cycleId = targetCycle.id;
+        }
+
         const payload = { 
           action: isUpdate ? 'update' : 'insert',
           id: recordId,
           table: table,
-          cycle_id: table === 'cycles' ? undefined : activeCycle.id,
+          cycle_id: cycleId,
           ...payloadData
         };
 
-        // UI先行更新用データの構築
         const localData = { ...payload };
         if(table === 'daily_records' && !localData.lh_result) localData.lh_result = '';
         
@@ -208,34 +182,30 @@
           newArray.push(localData);
         }
         
-        // 周期データの場合は開始日順にソート
         if (table === 'cycles') {
           newArray.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
         }
         
-        // 即座にStateを更新し、モーダルを閉じる
         Store.set({ [targetArrayKey]: newArray });
         if(table === 'cycles') Store.set({ activeCycle: newArray[newArray.length - 1] });
         
         App.closeModal();
         Utils.showToast('保存しました');
 
-        // バックグラウンドでAPI送信
         try {
           fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
             .then(res => res.json())
             .then(res => { if(res.status !== 'success') throw new Error(); })
-            .catch(() => Utils.showToast('クラウドへの保存に失敗しました', true));
+            .catch(() => Utils.showToast('クラウド保存に失敗', true));
         } catch(e) {}
         
         return true;
       }
     };
 
-    // --- 4. UI Rendering (Views) ---
     const Views = {
       home: () => {
-        const { activeCycle, daily, clinic, iui, settings } = Store.get();
+        const { activeCycle, daily, iui, settings } = Store.get();
         
         const headerHtml = `
           <div class="flex justify-between items-center mb-6 mt-4">
@@ -256,64 +226,78 @@
           `;
         }
 
+        const cycleDaily = daily.filter(d => d.cycle_id === activeCycle.id);
         const today = Utils.getTodayStr();
-        const startD = activeCycle.start_date;
-        const diffDays = Math.floor((new Date(today) - new Date(startD)) / 86400000) + 1;
+        const diffDays = Math.floor((new Date(today) - new Date(activeCycle.start_date)) / 86400000) + 1;
         
-        const latestIUI = iui[iui.length - 1];
-        const iuiDate = latestIUI?.planned_date ? new Date(latestIUI.planned_date) : null;
-        const abstainDate = iuiDate ? Utils.addDays(iuiDate, -settings.abstainDays) : null;
-        const periodDate = Utils.addDays(startD, settings.cycleLen);
+        const preds = App.getPredictions();
+        
+        let dashGridHtml = '';
+        if (preds.isIUIDone) {
+          const passedDays = Math.floor((new Date(today) - new Date(preds.actual)) / 86400000);
+          dashGridHtml = `
+            <div class="grid grid-cols-2 gap-y-5 gap-x-6">
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(済)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI後経過</span><span class="text-lg font-bold">${passedDays}<span class="text-[12px] font-normal text-sub ml-1">日目</span></span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">妊娠判定目安</span><span class="text-lg font-bold">${preds.test ? Utils.formatMMDD(new Date(preds.test)) : '-'}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+            </div>
+          `;
+        } else {
+          dashGridHtml = `
+            <div class="grid grid-cols-2 gap-y-5 gap-x-6">
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(予定)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">禁欲開始日</span><span class="text-lg font-bold">${preds.abstain ? Utils.formatMMDD(new Date(preds.abstain)) : '-'}</span></div>
+              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+            </div>
+          `;
+        }
 
-        const hasTodayDaily = daily.some(d => Utils.toLocalYYYYMMDD(d.date) === today && d.temperature);
-        const taskHtml = hasTodayDaily 
-          ? `<div class="flex items-center text-[15px]"><span class="mr-3 text-lg">✅</span><span class="text-sub">今日の記録は完了しています</span></div>`
-          : `<div class="flex items-center text-[15px]"><div class="w-2 h-2 rounded-full bg-primary mr-3"></div><span class="font-medium">基礎体温を記録しましょう</span></div>`;
+        const hasTodayDaily = cycleDaily.some(d => Utils.toLocalYYYYMMDD(d.date) === today && d.temperature);
+        let tasks = [];
+        
+        if (hasTodayDaily) {
+          tasks.push(`<div class="flex items-center text-[15px] py-3"><span class="mr-3 text-lg">✅</span><span class="text-sub">今日の体温記録は完了</span></div>`);
+        } else {
+          tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50" onclick="App.openModal('daily')"><div class="w-2 h-2 rounded-full bg-primary mr-3"></div><span class="font-medium">基礎体温を記録しましょう <span class="text-gray-300 ml-1">›</span></span></div>`);
+        }
+
+        if (preds.iui && !preds.isIUIDone) {
+          if (today === preds.iui) {
+            tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50 border-t border-border/50" onclick="App.openModal('iui')"><div class="w-2 h-2 rounded-full bg-red-400 mr-3"></div><span class="font-medium text-red-500">本日IUI予定日です。結果を記録 <span class="text-gray-300 ml-1">›</span></span></div>`);
+          } else if (today < preds.iui && preds.abstain && today >= preds.abstain) {
+             tasks.push(`<div class="flex items-center text-[15px] py-3 border-t border-border/50"><div class="w-2 h-2 rounded-full bg-[#8A6565] mr-3"></div><span class="font-medium text-[#8A6565]">禁欲期間中です (${Utils.formatMMDD(new Date(preds.iui))}予定)</span></div>`);
+          }
+        }
 
         return headerHtml + `
-          <!-- Dashboard Card -->
           <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6">
             <div class="flex justify-between items-center mb-5">
               <span class="px-3 py-1 bg-primary-light text-[#B07B7B] text-xs font-bold rounded-lg">${activeCycle.status}</span>
               <span class="text-sm text-sub font-medium">周期 ${diffDays}日目</span>
             </div>
-            <div class="grid grid-cols-2 gap-y-5 gap-x-6">
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(予定)</span><span class="text-lg font-bold">${Utils.formatMMDD(iuiDate)}</span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">禁欲開始日</span><span class="text-lg font-bold">${Utils.formatMMDD(abstainDate)}</span></div>
-              <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${Utils.formatMMDD(periodDate)}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
-            </div>
+            ${dashGridHtml}
           </div>
-
-          <!-- Tasks -->
           <h2 class="text-sm font-bold text-main mb-3 ml-1">サポートタスク</h2>
-          <div class="bg-card rounded-[16px] p-4 shadow-sm border border-border/20 mb-6 cursor-pointer active:scale-[0.98] transition-transform" onclick="${!hasTodayDaily ? "App.openModal('daily')" : ""}">
-            ${taskHtml}
+          <div class="bg-card rounded-[16px] px-4 shadow-sm border border-border/20 mb-6">
+            ${tasks.join('')}
           </div>
-
-          <!-- Quick Actions -->
           <h2 class="text-sm font-bold text-main mb-3 ml-1">クイック記録</h2>
           <div class="grid grid-cols-2 gap-3 mb-8">
             <button onclick="App.openModal('daily')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
-              <div class="flex items-center gap-2"><span class="text-lg">🌡</span><span class="text-[13px] font-bold">基礎体温</span></div>
-              <span class="text-gray-300">›</span>
+              <div class="flex items-center gap-2"><span class="text-lg">🌡</span><span class="text-[13px] font-bold">基礎体温</span></div><span class="text-gray-300">›</span>
             </button>
             <button onclick="App.openModal('clinic')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
-              <div class="flex items-center gap-2"><span class="text-lg">🩺</span><span class="text-[13px] font-bold">通院記録</span></div>
-              <span class="text-gray-300">›</span>
+              <div class="flex items-center gap-2"><span class="text-lg">🩺</span><span class="text-[13px] font-bold">通院記録</span></div><span class="text-gray-300">›</span>
             </button>
             <button onclick="App.openModal('meds')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
-              <div class="flex items-center gap-2"><span class="text-lg">💊</span><span class="text-[13px] font-bold">薬・注射</span></div>
-              <span class="text-gray-300">›</span>
+              <div class="flex items-center gap-2"><span class="text-lg">💊</span><span class="text-[13px] font-bold">薬・注射</span></div><span class="text-gray-300">›</span>
             </button>
             <button onclick="App.openModal('iui')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
-              <div class="flex items-center gap-2"><span class="text-lg">♡</span><span class="text-[13px] font-bold">IUI管理</span></div>
-              <span class="text-gray-300">›</span>
+              <div class="flex items-center gap-2"><span class="text-lg">♡</span><span class="text-[13px] font-bold">IUI管理</span></div><span class="text-gray-300">›</span>
             </button>
           </div>
-          
-          <div class="bg-primary-light rounded-xl p-4 text-center text-[13px] text-[#8A6565] italic">
-            妻のサポート、今日もお疲れ様です。
-          </div>
+          <div class="bg-primary-light rounded-xl p-4 text-center text-[13px] text-[#8A6565] italic">妻のサポート、今日もお疲れ様です。</div>
         `;
       },
 
@@ -321,12 +305,12 @@
         const { calMonth, daily, clinic } = Store.get();
         const year = calMonth.getFullYear();
         const month = calMonth.getMonth();
-        
         const firstDay = new Date(year, month, 1).getDay();
         const lastDay = new Date(year, month + 1, 0).getDate();
         
         const recordDates = new Set([...daily, ...clinic].map(r => Utils.toLocalYYYYMMDD(r.date || r.visit_date)));
         const todayStr = Utils.getTodayStr();
+        const preds = App.getPredictions();
 
         let cells = '';
         for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
@@ -335,19 +319,24 @@
           const isToday = dStr === todayStr;
           const hasRec = recordDates.has(dStr);
           
+          let eventsHtml = '';
+          if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
+          if (dStr === preds.abstain) eventsHtml += '<span class="text-[10px]">🕊</span>';
+          if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
+          if (dStr === preds.test) eventsHtml += '<span class="text-[10px]">👶</span>';
+
           cells += `
-            <div class="aspect-square flex flex-col items-center justify-center rounded-full relative cursor-pointer active:bg-gray-100 transition-colors ${isToday ? 'border border-primary font-bold' : ''}" 
+            <div class="aspect-square flex flex-col items-center pt-1 rounded-xl relative cursor-pointer active:bg-gray-100 transition-colors ${isToday ? 'border border-primary bg-primary-light/30' : ''}" 
                  onclick="App.selectDate('${dStr}')" id="cal-cell-${dStr}">
-              <span class="text-[15px]">${i}</span>
+              <span class="text-[14px] ${isToday ? 'text-primary font-bold' : ''} leading-none mb-0.5">${i}</span>
+              <div class="flex flex-wrap justify-center gap-[1px] leading-none px-0.5">${eventsHtml}</div>
               ${hasRec ? `<div class="w-1 h-1 bg-primary rounded-full absolute bottom-1"></div>` : ''}
             </div>
           `;
         }
 
         return `
-          <div class="mt-4 mb-6">
-            <h1 class="text-2xl font-serif tracking-wider text-main text-center">カレンダー</h1>
-          </div>
+          <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider text-main text-center">カレンダー</h1></div>
           <div class="bg-card rounded-[24px] p-5 shadow-sm border border-border/20">
             <div class="flex justify-between items-center mb-4 px-2">
               <button onclick="App.changeMonth(-1)" class="p-2 text-xl text-sub hover:text-main transition-colors">‹</button>
@@ -357,13 +346,9 @@
             <div class="grid grid-cols-7 text-center mb-2 text-xs font-bold text-sub">
               <div class="text-red-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
             </div>
-            <div class="grid grid-cols-7 text-center gap-1">
-              ${cells}
-            </div>
+            <div class="grid grid-cols-7 text-center gap-1">${cells}</div>
           </div>
-          <div id="cal-detail-area" class="mt-6">
-            <p class="text-center text-sub text-sm mt-10">日付をタップして記録を確認</p>
-          </div>
+          <div id="cal-detail-area" class="mt-6"><p class="text-center text-sub text-sm mt-10">日付をタップして記録を確認</p></div>
         `;
       },
 
@@ -377,43 +362,61 @@
                onclick="App.openModal('${r.type}', '${r.id}')">
             <div>
               <div class="font-bold text-[15px] mb-1">${Utils.toLocalYYYYMMDD(r.date)}</div>
-              <div class="text-[13px] text-sub">
-                ${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}
-              </div>
+              <div class="text-[13px] text-sub">${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}</div>
             </div>
             <div class="text-gray-300 text-xl">›</div>
           </div>
         `).join('');
         
         if(!listHtml) listHtml = '<p class="text-center text-sub mt-10 text-sm">記録がありません</p>';
-
+        
         return `
           <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">記録一覧</h1></div>
+          
+          <div class="bg-card rounded-[20px] p-5 shadow-sm border border-border/20 mb-8">
+            <div class="flex justify-between items-center mb-3">
+              <h2 class="text-sm font-bold text-main">基礎体温グラフ</h2>
+              <span class="text-xs text-sub">最新周期</span>
+            </div>
+            <div class="w-full h-[200px] relative">
+              <canvas id="tempChart"></canvas>
+            </div>
+          </div>
+
+          <h2 class="text-sm font-bold text-main mb-3 ml-1">すべての記録</h2>
           <div class="pb-4">${listHtml}</div>
         `;
       },
 
       cycles: () => {
         const { cycles } = Store.get();
-        let listHtml = cycles.slice().reverse().map(c => {
+        let listHtml = [...cycles].reverse().map((c, idx, arr) => {
           const sD = new Date(c.start_date);
+          let eD = new Date();
+          if (idx > 0) eD = new Date(arr[idx - 1].start_date);
+          
+          const diffDays = Math.floor((eD - sD) / 86400000) + (idx > 0 ? 0 : 1);
+          const statusColor = c.status === '進行中' ? 'bg-primary-light text-primary' : 'bg-gray-100 text-sub';
+
           return `
             <div class="bg-card rounded-[16px] p-4 mb-3 shadow-sm border border-border/20 flex justify-between items-center active:bg-gray-50 transition-colors cursor-pointer"
                  onclick="App.openModal('new-cycle', '${c.id}')">
-              <div>
-                <div class="flex gap-2 items-center mb-1">
-                  <span class="px-2 py-0.5 bg-gray-100 rounded text-[10px] text-sub font-bold">${c.status}</span>
-                  <span class="text-[11px] text-sub">${c.type || '未設定'}</span>
+              <div class="flex-1">
+                <div class="flex gap-2 items-center mb-2">
+                  <span class="px-2 py-0.5 rounded text-[11px] font-bold ${statusColor}">${c.status}</span>
+                  <span class="text-[12px] text-sub font-medium">${c.type || '未設定'}</span>
                 </div>
-                <div class="font-bold text-[16px]">${Utils.toLocalYYYYMMDD(sD)} 〜</div>
+                <div class="font-bold text-[16px] text-main">${Utils.toLocalYYYYMMDD(sD)} 〜</div>
               </div>
-              <div class="text-gray-300 text-xl">›</div>
+              <div class="text-right">
+                <div class="text-[20px] font-bold text-main">${diffDays}<span class="text-[12px] font-normal text-sub ml-1">日間</span></div>
+              </div>
+              <div class="text-gray-300 text-xl ml-3">›</div>
             </div>
           `;
         }).join('');
         
         if(!listHtml) listHtml = '<p class="text-center text-sub mt-10 text-sm">周期データがありません</p>';
-
         return `
           <div class="mt-4 mb-6 flex justify-between items-center">
             <h1 class="text-2xl font-serif tracking-wider">周期一覧</h1>
@@ -425,38 +428,42 @@
 
       settings: () => {
         const { settings } = Store.get();
+        const stats = App.getCycleStats();
+        
+        const statHtml = stats.count > 0 
+          ? `<div class="flex gap-2 mt-3">
+               <button onclick="App.applyCycleStat(${stats.avg})" class="flex-1 text-[11px] bg-primary-light text-primary font-bold py-2.5 rounded-lg active:bg-primary active:text-white transition-colors border border-primary/20">平均を適用 (${stats.avg}日)</button>
+               <button onclick="App.applyCycleStat(${stats.median})" class="flex-1 text-[11px] bg-primary-light text-primary font-bold py-2.5 rounded-lg active:bg-primary active:text-white transition-colors border border-primary/20">中央値を適用 (${stats.median}日)</button>
+             </div>
+             <p class="text-[10px] text-sub mt-2 text-right">※過去 ${stats.count} 周期の実績より算出</p>`
+          : `<p class="text-[10px] text-sub mt-2">※過去の周期データが蓄積されると算出されます</p>`;
+
         return `
           <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">設定</h1></div>
           
           <h2 class="text-sm font-bold text-main mb-3 ml-1">周期設定</h2>
           <div class="bg-card rounded-[20px] p-5 shadow-sm border border-border/20 mb-6">
-            <div class="mb-4">
+            <div class="mb-5">
               <label class="block text-[13px] text-main mb-2">平均周期日数</label>
-              <select id="set-cycle-len" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none" onchange="App.updateSettings('cycleLen', this.value)">
-                <option value="28" ${settings.cycleLen==28?'selected':''}>28日</option>
-                <option value="31" ${settings.cycleLen==31?'selected':''}>31日</option>
-                <option value="35" ${settings.cycleLen==35?'selected':''}>35日</option>
-              </select>
+              <div class="flex items-center gap-2">
+                <input type="number" id="set-cycle-len" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none font-bold" value="${settings.cycleLen}" onchange="App.updateSettings('cycleLen', this.value)">
+                <span class="text-sm font-bold text-sub">日</span>
+              </div>
+              ${statHtml}
             </div>
+            <hr class="border-border/50 mb-5">
             <div>
               <label class="block text-[13px] text-main mb-2">禁欲推奨日数</label>
-              <select id="set-abstinence" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none" onchange="App.updateSettings('abstainDays', this.value)">
-                <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option>
-                <option value="2" ${settings.abstainDays==2?'selected':''}>2日</option>
-                <option value="3" ${settings.abstainDays==3?'selected':''}>3日</option>
+              <select id="set-abstinence" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('abstainDays', this.value)">
+                <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option><option value="2" ${settings.abstainDays==2?'selected':''}>2日</option><option value="3" ${settings.abstainDays==3?'selected':''}>3日</option>
               </select>
             </div>
           </div>
-          
-          <div class="mt-12 text-center text-[10px] text-gray-300">
-            <p>Developed for Shogo & 🐈 Hotate, Uni</p>
-            <p class="mt-1">v2.1 State-driven Arch</p>
-          </div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v2.8 Save Settings</p></div>
         `;
       }
     };
 
-    // --- 5. Modal Forms Definitions ---
     const Forms = {
       daily: (id) => {
         const r = Store.get().daily.find(x => x.id === id) || {};
@@ -489,12 +496,36 @@
         `;
       },
       iui: (id) => {
-        const r = Store.get().iui.find(x => x.id === id) || {};
+        let r = null;
+        if (id) {
+          r = Store.get().iui.find(x => x.id === id);
+        } else {
+          const { activeCycle, iui } = Store.get();
+          if (activeCycle) {
+            const cycleIui = iui.filter(x => x.cycle_id === activeCycle.id);
+            if (cycleIui.length > 0) r = cycleIui[cycleIui.length - 1];
+          }
+        }
+        r = r || {};
+        const isDone = !!r.actual_date;
+        
         return `
           <div class="mb-6">
-            <label class="block text-[13px] font-bold mb-1">人工授精(IUI) 予定日</label>
-            <input type="date" id="form-planned" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.planned_date ? Utils.toLocalYYYYMMDD(r.planned_date) : Utils.getTodayStr()}">
+            <label class="block text-[13px] font-bold mb-1">予定日</label>
+            <input type="date" id="form-planned" class="w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.planned_date ? Utils.toLocalYYYYMMDD(r.planned_date) : Utils.getTodayStr()}">
           </div>
+          
+          <div class="mb-8 p-4 bg-gray-50 border border-border rounded-xl flex items-center justify-between">
+            <div>
+              <div class="font-bold text-[14px]">実施ステータス</div>
+              <div class="text-[11px] text-sub mt-0.5" id="form-actual-text">${isDone ? '実施済みとして記録されています' : '未実施（予定）'}</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="form-actual-check" class="sr-only peer" ${isDone ? 'checked' : ''} onchange="document.getElementById('form-actual-text').innerText = this.checked ? '実施済みとして記録されます' : '未実施（予定）'">
+              <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+          
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('iui')" class="w-full bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
@@ -528,15 +559,14 @@
       meds: () => `<div class="text-center text-sub py-10 font-bold">機能準備中</div>`
     };
 
-    const FormTitles = { daily: '日次記録', clinic: '通院記録', iui: 'IUI予定', 'new-cycle': '周期の登録・編集', meds: '薬・注射' };
+    const FormTitles = { daily: '日次記録', clinic: '通院記録', iui: 'IUI予定・結果', 'new-cycle': '周期の登録・編集', meds: '薬・注射' };
 
-    // --- 6. Main Application Logic ---
     const App = {
+      chartInstance: null,
+
       async init() {
         document.getElementById('global-loading').classList.remove('hidden');
         await API.fetchAll();
-        
-        // Auto-select today in calendar on load
         setTimeout(() => {
           if(Store.get().currentView === 'home') this.render();
           document.getElementById('global-loading').classList.add('hidden');
@@ -546,29 +576,84 @@
       render() {
         const { currentView } = Store.get();
         const content = document.getElementById('app-content');
-        
-        // Render current view
         content.innerHTML = Views[currentView] ? Views[currentView]() : '';
         content.classList.remove('hidden');
 
-        // Update nav UI
         document.querySelectorAll('.nav-btn').forEach(btn => {
           if(btn.dataset.target === currentView) {
-            btn.classList.add('text-primary');
-            btn.classList.remove('text-sub');
+            btn.classList.add('text-primary'); btn.classList.remove('text-sub');
           } else {
-            btn.classList.remove('text-primary');
-            btn.classList.add('text-sub');
+            btn.classList.remove('text-primary'); btn.classList.add('text-sub');
+          }
+        });
+
+        if (currentView === 'records') {
+          setTimeout(() => this.renderChart(), 50);
+        }
+      },
+
+      renderChart() {
+        const canvas = document.getElementById('tempChart');
+        if (!canvas) return;
+
+        const { activeCycle, daily } = Store.get();
+        if (!activeCycle) return;
+
+        const cycleDaily = daily
+          .filter(d => d.cycle_id === activeCycle.id && d.temperature)
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        if (cycleDaily.length === 0) return;
+
+        const labels = cycleDaily.map(d => Utils.formatMMDD(new Date(d.date)));
+        const data = cycleDaily.map(d => parseFloat(d.temperature));
+
+        if (this.chartInstance) {
+          this.chartInstance.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        this.chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '基礎体温',
+              data: data,
+              borderColor: '#D4A5A5',
+              backgroundColor: 'rgba(212, 165, 165, 0.2)',
+              borderWidth: 2,
+              pointBackgroundColor: '#D4A5A5',
+              pointRadius: 4,
+              tension: 0.3,
+              spanGaps: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+              legend: { display: false },
+              tooltip: { callbacks: { label: function(context) { return context.parsed.y + ' °C'; } } }
+            },
+            scales: {
+              y: {
+                suggestedMin: 36.0,
+                suggestedMax: 37.0,
+                ticks: { stepSize: 0.2, font: { size: 10 } },
+                grid: { color: '#F2F2F7' }
+              },
+              x: {
+                ticks: { font: { size: 10 } },
+                grid: { display: false }
+              }
+            }
           }
         });
       },
 
-      navigate(view) {
-        Store.set({ currentView: view });
-        window.scrollTo(0,0);
-      },
+      navigate(view) { Store.set({ currentView: view }); window.scrollTo(0,0); },
 
-      // Modal Logic
       openModal(type, id = null) {
         document.getElementById('modal-title').innerText = FormTitles[type];
         document.getElementById('modal-body').innerHTML = Forms[type](id);
@@ -577,28 +662,29 @@
         const sheet = document.getElementById('modal-sheet');
         
         overlay.classList.remove('hidden');
-        // trigger reflow
         void overlay.offsetWidth;
-        overlay.classList.remove('opacity-0');
-        overlay.classList.add('opacity-100');
-        
-        sheet.classList.remove('closed');
-        sheet.classList.add('open');
+        overlay.classList.remove('opacity-0'); overlay.classList.add('opacity-100');
+        sheet.classList.remove('closed'); sheet.classList.add('open');
       },
 
       closeModal() {
         const overlay = document.getElementById('modal-overlay');
         const sheet = document.getElementById('modal-sheet');
-        
-        sheet.classList.remove('open');
-        sheet.classList.add('closed');
-        overlay.classList.remove('opacity-100');
-        overlay.classList.add('opacity-0');
-        
+        sheet.classList.remove('open'); sheet.classList.add('closed');
+        overlay.classList.remove('opacity-100'); overlay.classList.add('opacity-0');
         setTimeout(() => { overlay.classList.add('hidden'); }, 300);
       },
 
-      // Form Handling
+      getCycleForDate(dateStr) {
+        const { cycles } = Store.get();
+        if (!cycles.length) return null;
+        const sorted = [...cycles].sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+        for (const c of sorted) {
+          if (dateStr >= Utils.toLocalYYYYMMDD(c.start_date)) return c;
+        }
+        return null;
+      },
+
       checkExistingDaily(dateStr) {
         const r = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === dateStr);
         document.getElementById('form-id').value = r ? r.id : '';
@@ -617,6 +703,7 @@
           payload.next_visit_date = document.getElementById('form-next').value;
         } else if (table === 'iui') {
           payload.planned_date = document.getElementById('form-planned').value;
+          payload.actual_date = document.getElementById('form-actual-check').checked ? payload.planned_date : '';
         } else if (table === 'cycles') {
           payload.start_date = document.getElementById('form-date').value;
           payload.type = document.getElementById('form-type').value;
@@ -626,7 +713,53 @@
         API.save(table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles', payload);
       },
 
-      // Feature specific logic
+      getCycleStats() {
+        const { cycles } = Store.get();
+        const lengths = [];
+        for (let i = 0; i < cycles.length - 1; i++) {
+          const s1 = new Date(cycles[i].start_date);
+          const s2 = new Date(cycles[i+1].start_date);
+          const days = Math.round((s2 - s1) / 86400000);
+          if (days >= 20 && days <= 50) lengths.push(days);
+        }
+        if (lengths.length === 0) return { avg: 31, median: 31, count: 0 };
+        const avg = Math.round(lengths.reduce((a,b)=>a+b, 0) / lengths.length);
+        lengths.sort((a,b)=>a-b);
+        const mid = Math.floor(lengths.length / 2);
+        const median = lengths.length % 2 !== 0 ? lengths[mid] : Math.round((lengths[mid - 1] + lengths[mid]) / 2);
+        return { avg, median, count: lengths.length };
+      },
+
+      applyCycleStat(val) {
+        document.getElementById('set-cycle-len').value = val;
+        this.updateSettings('cycleLen', val);
+        Utils.showToast(`${val}日に設定しました`);
+      },
+
+      getPredictions() {
+        const { activeCycle, iui, settings } = Store.get();
+        let preds = { iui: null, abstain: null, period: null, test: null, isIUIDone: false, actual: null };
+        if (!activeCycle) return preds;
+        
+        const cycleIUI = iui.filter(i => i.cycle_id === activeCycle.id);
+        const latestIUI = cycleIUI[cycleIUI.length - 1];
+        
+        preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(activeCycle.start_date, settings.cycleLen));
+        
+        if (latestIUI) {
+          preds.isIUIDone = !!latestIUI.actual_date;
+          if (latestIUI.planned_date) {
+            preds.iui = Utils.toLocalYYYYMMDD(latestIUI.planned_date);
+            preds.abstain = Utils.toLocalYYYYMMDD(Utils.addDays(latestIUI.planned_date, -settings.abstainDays));
+          }
+          if (preds.isIUIDone) {
+            preds.actual = Utils.toLocalYYYYMMDD(latestIUI.actual_date);
+            preds.test = Utils.toLocalYYYYMMDD(Utils.addDays(latestIUI.actual_date, 14));
+          }
+        }
+        return preds;
+      },
+
       changeMonth(delta) {
         const d = Store.get().calMonth;
         d.setMonth(d.getMonth() + delta);
@@ -634,7 +767,6 @@
       },
 
       selectDate(dStr) {
-        // UI Selection visual update without full re-render
         document.querySelectorAll('[id^="cal-cell-"]').forEach(el => {
           el.classList.remove('bg-primary', 'text-white');
           const dot = el.querySelector('.bg-white');
@@ -648,14 +780,21 @@
           if(dot && targetEl.classList.contains('bg-primary')) dot.classList.replace('bg-primary', 'bg-white');
         }
 
-        // Build detail content
+        const preds = App.getPredictions();
+        let eventContent = '';
+        if (dStr === preds.iui) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#B07B7B]">🌸 IUI実施予定日</div>`;
+        if (dStr === preds.abstain) eventContent += `<div class="mb-1 text-[13px] font-bold text-[#8A6565]">🕊 禁欲開始日</div>`;
+        if (dStr === preds.period) eventContent += `<div class="mb-1 text-[13px] font-bold text-red-400">🩸 次回生理予定日</div>`;
+        if (dStr === preds.test) eventContent += `<div class="mb-1 text-[13px] font-bold text-blue-400">👶 妊娠判定目安</div>`;
+
         const { daily, clinic } = Store.get();
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
         const cRec = clinic.find(r => Utils.toLocalYYYYMMDD(r.visit_date) === dStr);
         
         let content = '';
-        if(dRec) content += `<div class="mb-1">🌡 体温: <span class="font-bold">${dRec.temperature || '-'}</span> °C</div>`;
-        if(cRec) content += `<div>🏥 受診記録あり</div>`;
+        if(eventContent) content += `<div class="mb-3 pb-2 border-b border-border/50">${eventContent}</div>`;
+        if(dRec) content += `<div class="mb-1 text-[14px]">🌡 体温: <span class="font-bold">${dRec.temperature || '-'}</span> °C</div>`;
+        if(cRec) content += `<div class="text-[14px]">🏥 受診記録あり</div>`;
         
         const actionHtml = `<button class="w-full mt-4 py-3 rounded-xl border border-primary text-primary font-bold text-sm" onclick="App.openModal('daily', '${dRec?dRec.id:''}')">日次記録を入力・編集</button>`;
 
@@ -664,12 +803,9 @@
           ${content ? `<div class="bg-card p-4 rounded-[16px] shadow-sm border border-border/20">${content}${actionHtml}</div>` : `<div class="text-sub text-sm">記録なし${actionHtml}</div>`}
         `;
         
-        // Modal連携のため一時的に選択日をセット
         setTimeout(() => {
           const dateInput = document.getElementById('form-date');
-          if(dateInput && !document.getElementById('modal-sheet').classList.contains('open')) {
-            dateInput.value = dStr;
-          }
+          if(dateInput && !document.getElementById('modal-sheet').classList.contains('open')) dateInput.value = dStr;
         }, 10);
       },
 
@@ -677,13 +813,11 @@
         const s = Store.get().settings;
         s[key] = parseInt(val, 10);
         Store.set({ settings: s });
+        localStorage.setItem('iui_settings', JSON.stringify(s));
       }
     };
 
-    // --- 7. Boot ---
     window.onload = () => App.init();
   </script>
 </body>
 </html>
-
-
