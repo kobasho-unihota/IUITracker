@@ -147,7 +147,6 @@
         daily: [],
         clinic: [],
         iui: [],
-        syncEvents: [], // カレンダー同期用一時データ
         activeCycle: null,
         calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         settings: JSON.parse(localStorage.getItem('iui_settings')) || { cycleLen: 31, abstainDays: 2 }
@@ -331,14 +330,6 @@
             </div>
           `;
         }
-        
-        const syncBtnHtml = `
-          <div class="mt-5 pt-4 border-t border-border/50">
-            <button onclick="App.syncBulkCalendar()" class="w-full py-3 bg-gray-50 text-main text-[12px] font-bold rounded-xl border border-border/50 shadow-sm flex justify-center items-center gap-2 active:bg-gray-100 transition-colors">
-              <span class="text-base">📅</span> ${dashTab === 'current' ? '今周期の予定をカレンダーに追加' : '次周期の予測をカレンダーに追加'}
-            </button>
-          </div>
-        `;
 
         const hasTodayDaily = cycleDaily.some(d => Utils.toLocalYYYYMMDD(d.date) === today && d.temperature);
         let tasks = [];
@@ -365,7 +356,6 @@
             </div>
             ${tabsHtml}
             ${dashGridHtml}
-            ${syncBtnHtml}
           </div>
           <h2 class="text-sm font-bold text-main mb-3 ml-1">サポートタスク</h2>
           <div class="bg-card rounded-[16px] px-4 shadow-sm border border-border/20 mb-6">
@@ -558,11 +548,11 @@
             <div>
               <label class="block text-[13px] text-main mb-2">禁欲推奨日数</label>
               <select id="set-abstinence" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('abstainDays', this.value)">
-                <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option><option value="2" ${settings.abstainDays==2?'selected':''}>2日</option><option value="3" ${settings.abstainDays==3?'selected':''}>3日</option>
+                <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option><option value="2" ${settings.abstainDays==2?'selected':''}>2日</option><option value="3" ${settings.abstainDays==3?'selected':''}>3日</option><option value="4" ${settings.abstainDays==4?'selected':''}>4日</option><option value="5" ${settings.abstainDays==5?'selected':''}>5日</option>
               </select>
             </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.7 Direct Cal Sync</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.8 Clean UI & Days</p></div>
         `;
       }
     };
@@ -659,34 +649,10 @@
           <button onclick="App.submitForm('cycles')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">周期を保存</button>
         `;
       },
-      'calendar-sync': () => {
-        const events = Store.get().syncEvents || [];
-        if (events.length === 0) return '<p class="text-center text-sub">予定がありません</p>';
-        
-        const listHtml = events.map(ev => `
-          <div class="mb-3 p-4 bg-gray-50 border border-border rounded-xl flex items-center justify-between">
-            <div>
-              <div class="text-[12px] text-sub mb-1">${Utils.formatMMDD(new Date(ev.date))}</div>
-              <div class="text-[14px] font-bold text-main">${ev.title}</div>
-            </div>
-            <button onclick="App.openCalendarLink('${ev.title}', '${ev.date}')" class="text-[12px] bg-white border border-primary text-primary px-3 py-1.5 rounded-lg shadow-sm active:bg-primary active:text-white transition-colors font-bold">追加する</button>
-          </div>
-        `).join('');
-        
-        return `
-          <div class="mb-4">
-            <p class="text-[12px] text-sub leading-relaxed mb-4">
-              Googleカレンダーの仕様上、1件ずつの登録となります。<br>各予定の「追加する」ボタンをタップしてカレンダーに保存してください。
-            </p>
-            ${listHtml}
-          </div>
-          <button onclick="App.closeModal()" class="w-full max-w-full box-border bg-gray-200 text-main font-bold py-4 rounded-[16px] active:scale-[0.98] transition-transform">閉じる</button>
-        `;
-      },
       meds: () => `<div class="text-center text-sub py-10 font-bold">機能準備中</div>`
     };
 
-    const FormTitles = { daily: '日次記録', clinic: '通院記録', iui: 'IUI予定・結果', 'new-cycle': '周期の登録・編集', meds: '薬・注射', 'calendar-sync': 'カレンダーへ登録' };
+    const FormTitles = { daily: '日次記録', clinic: '通院記録', iui: 'IUI予定・結果', 'new-cycle': '周期の登録・編集', meds: '薬・注射' };
 
     const App = {
       chartInstance: null,
@@ -1019,31 +985,6 @@
       openCalendarLink(title, dateStr) {
         const url = Utils.getCalendarUrl(title, dateStr);
         window.open(url, '_blank');
-      },
-
-      syncBulkCalendar() {
-        const { dashTab } = Store.get();
-        const preds = App.getPredictions();
-        const events = [];
-        
-        if (dashTab === 'current') {
-          if (preds.iui && !preds.isIUIDone) events.push({ title: '🌸 IUI実施予定', date: preds.iui });
-          if (preds.abstain && !preds.isIUIDone) events.push({ title: '🕊 禁欲開始', date: preds.abstain });
-          if (preds.period) events.push({ title: '🩸 次回生理予定', date: preds.period });
-        } else {
-          // 次周期(3周期分)の予測をまとめてリストアップ
-          preds.futureCycles.forEach((fc, idx) => {
-            const prefix = `[${idx+1}周期先] `;
-            if (fc.iui) events.push({ title: prefix + '🌸 IUI目安', date: fc.iui });
-            if (fc.abstain) events.push({ title: prefix + '🕊 禁欲開始', date: fc.abstain });
-            if (fc.period) events.push({ title: prefix + '🩸 生理予定日', date: fc.period });
-          });
-        }
-        
-        if (events.length === 0) return Utils.showToast('登録する予定がありません', true);
-        
-        Store.set({ syncEvents: events });
-        App.openModal('calendar-sync');
       }
     };
 
