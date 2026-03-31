@@ -157,6 +157,7 @@
         daily: [],
         clinic: [],
         iui: [],
+        aiPrediction: JSON.parse(localStorage.getItem('iui_ai_prediction')) || null,
         activeCycle: null,
         calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         settings: getSettings()
@@ -252,6 +253,72 @@
         } catch(e) {}
         
         return true;
+      },
+      
+      async analyzeWithAI() {
+        const { activeCycle, daily } = Store.get();
+        if (!activeCycle) return Utils.showToast('アクティブな周期がありません', true);
+        
+        const cycleDaily = daily
+          .filter(d => d.cycle_id === activeCycle.id && d.temperature)
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+          
+        if (cycleDaily.length < 5) return Utils.showToast('予測にはもう少し体温データが必要です（5日分以上）', true);
+
+        document.getElementById('global-loading').classList.remove('hidden');
+        
+        const dataText = cycleDaily.map(d => `${Utils.toLocalYYYYMMDD(d.date)}: ${d.temperature}度`).join('\n');
+        
+        const prompt = `あなたは不妊治療をサポートする温かいAIです。以下の今周期の基礎体温データから、低温相から高温相へ移行したタイミングを分析し、排卵日を推測してください。また、排卵日から約14日後を次回の生理予定日として予測してください。
+
+【基礎体温データ】
+${dataText}
+
+結果は以下のJSONスキーマで返してください。
+reasonの項目には、分析の理由に加えて、語尾に「にゃ」などをつける猫（名前はほたて、またはうに）になりきった温かい励ましの言葉を1文だけ添えてください。`;
+
+        const apiKey = ""; 
+        const effectiveKey = apiKey || "AIzaSyBidiiH1mku4yX7U-JX2HKaIROAkMzUEeE";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${effectiveKey}`;
+        
+        const payload = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                ovulation_date: { type: "STRING", description: "YYYY-MM-DD形式。推測できない場合は空文字" },
+                next_period_date: { type: "STRING", description: "YYYY-MM-DD形式。推測できない場合は空文字" },
+                reason: { type: "STRING", description: "推測の理由や温かい励ましのコメント（2〜3文）" }
+              }
+            }
+          }
+        };
+
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (result.error) throw new Error(result.error.message);
+          
+          const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const aiPred = JSON.parse(text);
+            aiPred.cycle_id = activeCycle.id;
+            Store.set({ aiPrediction: aiPred });
+            localStorage.setItem('iui_ai_prediction', JSON.stringify(aiPred));
+            Utils.showToast('AIの分析が完了しました✨');
+          }
+        } catch (e) {
+          console.error(e);
+          Utils.showToast('AI分析に失敗しました', true);
+        } finally {
+          document.getElementById('global-loading').classList.add('hidden');
+        }
       }
     };
 
@@ -341,6 +408,38 @@
           `;
         }
 
+        // AI分析UIの生成
+        let aiHtml = '';
+        const aiPred = Store.get().aiPrediction;
+        const cycleDailyForAI = daily.filter(d => d.cycle_id === activeCycle.id && d.temperature);
+        
+        if (aiPred && aiPred.cycle_id === activeCycle.id) {
+          aiHtml = `
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-indigo-100 mb-6">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-sm font-bold text-indigo-900 flex items-center gap-2"><span class="text-lg">✨</span> AI体温分析</h2>
+                <button onclick="API.analyzeWithAI()" class="text-[11px] bg-white text-indigo-600 px-3 py-1.5 rounded-lg shadow-sm font-bold active:bg-gray-50 transition-colors">最新データで再分析</button>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-white/70 p-3 rounded-xl"><span class="text-[11px] text-indigo-800/70 block mb-1">推測・排卵日</span><span class="font-bold text-indigo-900 text-[15px]">${aiPred.ovulation_date ? Utils.formatMMDD(new Date(aiPred.ovulation_date)) : '-'}</span></div>
+                <div class="bg-white/70 p-3 rounded-xl"><span class="text-[11px] text-indigo-800/70 block mb-1">予測・次生理日</span><span class="font-bold text-red-400 text-[15px]">${aiPred.next_period_date ? Utils.formatMMDD(new Date(aiPred.next_period_date)) : '-'}</span></div>
+              </div>
+              <div class="text-[12px] text-indigo-900 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-indigo-100/50">
+                <span class="font-bold mb-1 block text-indigo-800">💡 AIからのコメント</span>
+                ${aiPred.reason}
+              </div>
+            </div>
+          `;
+        } else if (cycleDailyForAI.length >= 5) {
+          aiHtml = `
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-indigo-100 mb-6 text-center">
+              <div class="text-3xl mb-2">✨</div>
+              <p class="text-[13px] text-indigo-900 font-bold mb-4">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
+              <button onclick="API.analyzeWithAI()" class="bg-indigo-500 text-white w-full py-3.5 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-transform">AIで予測する</button>
+            </div>
+          `;
+        }
+
         const hasTodayDaily = cycleDaily.some(d => Utils.toLocalYYYYMMDD(d.date) === today && d.temperature);
         let tasks = [];
         
@@ -367,6 +466,7 @@
             ${tabsHtml}
             ${dashGridHtml}
           </div>
+          ${aiHtml}
           <h2 class="text-sm font-bold text-main mb-3 ml-1">サポートタスク</h2>
           <div class="bg-card rounded-[16px] px-4 shadow-sm border border-border/20 mb-6">
             ${tasks.join('')}
@@ -401,10 +501,10 @@
         const preds = App.getPredictions();
         const periodDates = App.getPeriodDates();
         const abstainDates = App.getAbstainDates();
+        const aiPred = Store.get().aiPrediction;
 
         const cycleStarts = cycles.map(c => Utils.toLocalYYYYMMDD(c.start_date));
         const iuiDates = iui.map(ev => Utils.toLocalYYYYMMDD(ev.planned_date)).filter(d => d);
-        const abstainStartDates = iuiDates.map(dateStr => Utils.toLocalYYYYMMDD(Utils.addDays(dateStr, -settings.abstainDays)));
 
         const futurePeriods = preds.futureCycles.map(fc => fc.period);
         const futureIuis = preds.futureCycles.map(fc => fc.iui);
@@ -428,6 +528,12 @@
           if (cycleStarts.includes(dStr)) eventsHtml += '<span class="text-[10px]">🩸</span>';
           else if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
           else if (futurePeriods.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
+          
+          // AI推測・予測
+          if (aiPred && aiPred.cycle_id === Store.get().activeCycle?.id) {
+             if (dStr === aiPred.ovulation_date) eventsHtml += '<span class="text-[10px]">🥚</span>'; 
+             if (dStr === aiPred.next_period_date) eventsHtml += '<span class="text-[10px]">✨</span>'; 
+          }
 
           let bgClass = '';
           if (isPeriod) {
@@ -589,7 +695,7 @@
               </select>
             </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.9 Period Highlight</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v4.0 AI Prediction</p></div>
         `;
       }
     };
@@ -1020,6 +1126,7 @@
 
         const { daily, clinic, cycles, iui, settings } = Store.get();
         const preds = App.getPredictions();
+        const aiPred = Store.get().aiPrediction;
         
         const cycleStarts = cycles.map(c => Utils.toLocalYYYYMMDD(c.start_date));
         const iuiDates = iui.map(ev => Utils.toLocalYYYYMMDD(ev.planned_date)).filter(d => d);
@@ -1042,13 +1149,14 @@
         else if (dStr === preds.iui) eventContent += makeEventRow('🌸 IUI実施予定日', 'text-[#B07B7B]', dStr);
         else if (futureIuis.includes(dStr)) eventContent += makeEventRow('🌸 IUI目安 (予測)', 'text-[#B07B7B]/70', dStr);
         
-        if (abstainStartDates.includes(dStr)) eventContent += makeEventRow('🕊 禁欲開始日', 'text-[#8A6565]', dStr);
-        else if (dStr === preds.abstain) eventContent += makeEventRow('🕊 禁欲開始日', 'text-[#8A6565]', dStr);
-        else if (futureAbstains.includes(dStr)) eventContent += makeEventRow('🕊 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
-        
         if (cycleStarts.includes(dStr)) eventContent += makeEventRow('🩸 生理開始日', 'text-red-400', dStr);
         else if (dStr === preds.period) eventContent += makeEventRow('🩸 次回生理予定日', 'text-red-400', dStr);
         else if (futurePeriods.includes(dStr)) eventContent += makeEventRow('🩸 生理予定日 (予測)', 'text-red-400/70', dStr);
+
+        if (aiPred && aiPred.cycle_id === Store.get().activeCycle?.id) {
+          if (dStr === aiPred.ovulation_date) eventContent += makeEventRow('🥚 排卵日 (AI推測)', 'text-indigo-500', dStr);
+          if (dStr === aiPred.next_period_date) eventContent += makeEventRow('✨ 次回生理予定 (AI予測)', 'text-red-400', dStr);
+        }
 
         const isPeriod = App.getPeriodDates().has(dStr);
         const isPeriodStart = cycleStarts.includes(dStr) || dStr === preds.period || futurePeriods.includes(dStr);
@@ -1058,7 +1166,7 @@
 
         const isAbstain = App.getAbstainDates().has(dStr);
         const isAbstainStart = abstainStartDates.includes(dStr) || dStr === preds.abstain || futureAbstains.includes(dStr);
-        if (isAbstain && !isAbstainStart) {
+        if (isAbstain) {
           eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-[#8A6565]/70">🕊 禁欲期間</span><div></div></div>`;
         }
 
@@ -1100,3 +1208,5 @@
   </script>
 </body>
 </html>
+
+
