@@ -136,7 +136,8 @@
         clinic: [],
         iui: [],
         activeCycle: null,
-        calMonth: new Date(),
+        // 月末のバグを防ぐため、常に「その月の1日」を基準日として保持する
+        calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         settings: JSON.parse(localStorage.getItem('iui_settings')) || { cycleLen: 31, abstainDays: 2 }
       },
       set(updates) {
@@ -235,7 +236,7 @@
 
     const Views = {
       home: () => {
-        const { activeCycle, daily, settings, dashTab } = Store.get();
+        const { activeCycle, daily, dashTab } = Store.get();
         
         const headerHtml = `
           <div class="flex justify-between items-center mb-6 mt-4">
@@ -267,9 +268,9 @@
         const tabNextClass = dashTab === 'next' ? 'text-primary border-primary' : 'text-sub border-transparent';
 
         const tabsHtml = `
-          <div class="flex border-b border-border/50 mb-4">
+          <div class="flex border-b border-border/50 mb-5">
             <button class="flex-1 pb-2 text-[13px] font-bold ${tabCurrentClass} border-b-2 transition-colors" onclick="App.switchDashTab('current')">今回周期</button>
-            <button class="flex-1 pb-2 text-[13px] font-bold ${tabNextClass} border-b-2 transition-colors" onclick="App.switchDashTab('next')">今後の予測</button>
+            <button class="flex-1 pb-2 text-[13px] font-bold ${tabNextClass} border-b-2 transition-colors" onclick="App.switchDashTab('next')">次周期(予測)</button>
           </div>
         `;
 
@@ -294,7 +295,6 @@
             `;
           }
         } else {
-          // 向こう3周期分の予測表示
           let futureHtml = '';
           preds.futureCycles.forEach((fc, idx) => {
             const opacity = idx === 0 ? 'border-primary' : idx === 1 ? 'border-primary/60' : 'border-primary/30';
@@ -315,7 +315,7 @@
               ${futureHtml}
             </div>
             <div class="mt-4 p-3 bg-gray-50 rounded-xl text-[10px] text-sub leading-relaxed">
-              ※今周期の実績と設定（平均周期${settings.cycleLen}日）から算出した向こう3周期分の参考スケジュールです。
+              ※今周期の実績と設定から算出した参考スケジュールです。<br>IUI目安は今周期の実績日数を基に算出しています。
             </div>
           `;
         }
@@ -364,9 +364,6 @@
             <button onclick="App.openModal('iui')" class="bg-card rounded-[16px] p-4 flex justify-between items-center shadow-sm border border-border/20 active:bg-gray-50 transition-colors">
               <div class="flex items-center gap-2"><span class="text-lg">♡</span><span class="text-[13px] font-bold">IUI管理</span></div><span class="text-gray-300">›</span>
             </button>
-          </div>
-          <div class="bg-primary-light rounded-xl p-4 text-center text-[13px] text-[#8A6565] italic flex flex-col items-center justify-center gap-2">
-            <span>ほたて君とうに君と一緒に、<br>妻のサポート今日もお疲れ様です🐈🐈</span>
           </div>
         `;
       },
@@ -543,7 +540,7 @@
               </select>
             </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.4 Multi-Cycle Prediction</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.5 Fixed Calendar Bug</p></div>
         `;
       }
     };
@@ -853,7 +850,7 @@
         const { activeCycle, iui, settings } = Store.get();
         let preds = { 
           iui: null, abstain: null, period: null, isIUIDone: false, actual: null, 
-          futureCycles: [] // { period, iui, abstain } の配列
+          futureCycles: [] 
         };
         if (!activeCycle) return preds;
         
@@ -881,7 +878,6 @@
             iuiCycleDays = Math.floor((targetIuiDate - new Date(startD)) / 86400000);
           }
           
-          // 向こう3周期分の予測を計算
           for (let i = 1; i <= 3; i++) {
             const fPeriodObj = Utils.addDays(startD, settings.cycleLen * i);
             const fIuiObj = Utils.addDays(fPeriodObj, iuiCycleDays);
@@ -899,9 +895,9 @@
       },
 
       changeMonth(delta) {
-        const d = Store.get().calMonth;
-        d.setMonth(d.getMonth() + delta);
-        Store.set({ calMonth: d });
+        const current = Store.get().calMonth;
+        const nextMonth = new Date(current.getFullYear(), current.getMonth() + delta, 1);
+        Store.set({ calMonth: nextMonth });
       },
 
       selectDate(dStr) {
@@ -967,5 +963,6 @@
   </script>
 </body>
 </html>
+
 
 
