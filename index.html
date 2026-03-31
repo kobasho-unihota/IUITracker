@@ -390,7 +390,7 @@
       },
 
       calendar: () => {
-        const { calMonth, daily, clinic } = Store.get();
+        const { calMonth, daily, clinic, cycles, iui, settings } = Store.get();
         const year = calMonth.getFullYear();
         const month = calMonth.getMonth();
         const firstDay = new Date(year, month, 1).getDay();
@@ -400,10 +400,14 @@
         const todayStr = Utils.getTodayStr();
         const preds = App.getPredictions();
         const periodDates = App.getPeriodDates();
+        const abstainDates = App.getAbstainDates();
+
+        const cycleStarts = cycles.map(c => Utils.toLocalYYYYMMDD(c.start_date));
+        const iuiDates = iui.map(ev => Utils.toLocalYYYYMMDD(ev.planned_date)).filter(d => d);
+        const abstainStartDates = iuiDates.map(dateStr => Utils.toLocalYYYYMMDD(Utils.addDays(dateStr, -settings.abstainDays)));
 
         const futurePeriods = preds.futureCycles.map(fc => fc.period);
         const futureIuis = preds.futureCycles.map(fc => fc.iui);
-        const futureAbstains = preds.futureCycles.map(fc => fc.abstain);
 
         let cells = '';
         for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
@@ -412,17 +416,27 @@
           const isToday = dStr === todayStr;
           const hasRec = recordDates.has(dStr);
           const isPeriod = periodDates.has(dStr);
+          const isAbstain = abstainDates.has(dStr);
           
           let eventsHtml = '';
-          if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
-          if (dStr === preds.abstain) eventsHtml += '<span class="text-[10px]">🕊</span>';
-          if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
+          // IUI
+          if (iuiDates.includes(dStr)) eventsHtml += '<span class="text-[10px]">🌸</span>';
+          else if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
+          else if (futureIuis.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">🌸</span>';
           
-          if (futureIuis.includes(dStr) && dStr !== preds.iui) eventsHtml += '<span class="text-[10px] opacity-40">🌸</span>';
-          if (futureAbstains.includes(dStr) && dStr !== preds.abstain) eventsHtml += '<span class="text-[10px] opacity-40">🕊</span>';
-          if (futurePeriods.includes(dStr) && dStr !== preds.period) eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
+          // 生理開始
+          if (cycleStarts.includes(dStr)) eventsHtml += '<span class="text-[10px]">🩸</span>';
+          else if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
+          else if (futurePeriods.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
 
-          const bgClass = isPeriod ? 'bg-[#FDF2F8]' : (isToday ? 'bg-primary-light/30' : '');
+          let bgClass = '';
+          if (isPeriod) {
+            bgClass = 'bg-[#FDF2F8]';
+          } else if (isAbstain) {
+            bgClass = 'bg-slate-100';
+          } else if (isToday) {
+            bgClass = 'bg-primary-light/30';
+          }
           const borderClass = isToday ? 'border border-primary' : '';
           const textClass = isToday ? 'text-primary font-bold' : '';
 
@@ -949,6 +963,36 @@
         return periodDates;
       },
 
+      getAbstainDates() {
+        const { iui, settings } = Store.get();
+        const preds = App.getPredictions();
+        const abstainDates = new Set();
+        
+        const addDates = (abstainStr, iuiStr) => {
+          if (!abstainStr || !iuiStr) return;
+          let currentStr = abstainStr;
+          let safety = 0;
+          while (currentStr < iuiStr && safety < 15) { 
+            abstainDates.add(currentStr);
+            currentStr = Utils.toLocalYYYYMMDD(Utils.addDays(currentStr, 1));
+            safety++;
+          }
+        };
+
+        iui.forEach(ev => {
+          if (ev.planned_date) {
+            const iuiStr = Utils.toLocalYYYYMMDD(ev.planned_date);
+            const abstainStr = Utils.toLocalYYYYMMDD(Utils.addDays(ev.planned_date, -settings.abstainDays));
+            addDates(abstainStr, iuiStr);
+          }
+        });
+
+        addDates(preds.abstain, preds.iui);
+        preds.futureCycles.forEach(fc => addDates(fc.abstain, fc.iui));
+        
+        return abstainDates;
+      },
+
       goToday() {
         const now = new Date();
         Store.set({ calMonth: new Date(now.getFullYear(), now.getMonth(), 1) });
@@ -974,7 +1018,13 @@
           if(dot && targetEl.classList.contains('bg-primary')) dot.classList.replace('bg-primary', 'bg-white');
         }
 
+        const { daily, clinic, cycles, iui, settings } = Store.get();
         const preds = App.getPredictions();
+        
+        const cycleStarts = cycles.map(c => Utils.toLocalYYYYMMDD(c.start_date));
+        const iuiDates = iui.map(ev => Utils.toLocalYYYYMMDD(ev.planned_date)).filter(d => d);
+        const abstainStartDates = iuiDates.map(dateStr => Utils.toLocalYYYYMMDD(Utils.addDays(dateStr, -settings.abstainDays)));
+
         const futurePeriods = preds.futureCycles.map(fc => fc.period);
         const futureIuis = preds.futureCycles.map(fc => fc.iui);
         const futureAbstains = preds.futureCycles.map(fc => fc.abstain);
@@ -988,21 +1038,30 @@
           </div>
         `;
         
-        if (dStr === preds.iui) eventContent += makeEventRow('🌸 IUI実施予定日', 'text-[#B07B7B]', dStr);
-        if (dStr === preds.abstain) eventContent += makeEventRow('🕊 禁欲開始日', 'text-[#8A6565]', dStr);
-        if (dStr === preds.period) eventContent += makeEventRow('🩸 次回生理予定日', 'text-red-400', dStr);
+        if (iuiDates.includes(dStr)) eventContent += makeEventRow('🌸 IUI実施日', 'text-[#B07B7B]', dStr);
+        else if (dStr === preds.iui) eventContent += makeEventRow('🌸 IUI実施予定日', 'text-[#B07B7B]', dStr);
+        else if (futureIuis.includes(dStr)) eventContent += makeEventRow('🌸 IUI目安 (予測)', 'text-[#B07B7B]/70', dStr);
         
-        if (futureIuis.includes(dStr) && dStr !== preds.iui) eventContent += makeEventRow('🌸 IUI目安 (予測)', 'text-[#B07B7B]/70', dStr);
-        if (futureAbstains.includes(dStr) && dStr !== preds.abstain) eventContent += makeEventRow('🕊 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
-        if (futurePeriods.includes(dStr) && dStr !== preds.period) eventContent += makeEventRow('🩸 生理予定日 (予測)', 'text-red-400/70', dStr);
+        if (abstainStartDates.includes(dStr)) eventContent += makeEventRow('🕊 禁欲開始日', 'text-[#8A6565]', dStr);
+        else if (dStr === preds.abstain) eventContent += makeEventRow('🕊 禁欲開始日', 'text-[#8A6565]', dStr);
+        else if (futureAbstains.includes(dStr)) eventContent += makeEventRow('🕊 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
+        
+        if (cycleStarts.includes(dStr)) eventContent += makeEventRow('🩸 生理開始日', 'text-red-400', dStr);
+        else if (dStr === preds.period) eventContent += makeEventRow('🩸 次回生理予定日', 'text-red-400', dStr);
+        else if (futurePeriods.includes(dStr)) eventContent += makeEventRow('🩸 生理予定日 (予測)', 'text-red-400/70', dStr);
 
         const isPeriod = App.getPeriodDates().has(dStr);
-        const isPeriodStart = Store.get().cycles.some(c => Utils.toLocalYYYYMMDD(c.start_date) === dStr) || dStr === preds.period || futurePeriods.includes(dStr);
+        const isPeriodStart = cycleStarts.includes(dStr) || dStr === preds.period || futurePeriods.includes(dStr);
         if (isPeriod && !isPeriodStart) {
           eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-red-400/70">🩸 生理期間</span><div></div></div>`;
         }
 
-        const { daily, clinic } = Store.get();
+        const isAbstain = App.getAbstainDates().has(dStr);
+        const isAbstainStart = abstainStartDates.includes(dStr) || dStr === preds.abstain || futureAbstains.includes(dStr);
+        if (isAbstain && !isAbstainStart) {
+          eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-[#8A6565]/70">🕊 禁欲期間</span><div></div></div>`;
+        }
+
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
         const cRec = clinic.find(r => Utils.toLocalYYYYMMDD(r.visit_date) === dStr);
         
@@ -1041,6 +1100,11 @@
   </script>
 </body>
 </html>
+
+
+
+
+
 
 
 
