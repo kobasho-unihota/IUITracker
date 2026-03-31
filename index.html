@@ -139,6 +139,16 @@
       }
     };
 
+    const getSettings = () => {
+      const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5 };
+      try {
+        const savedSettings = JSON.parse(localStorage.getItem('iui_settings'));
+        return savedSettings ? { ...defaultSettings, ...savedSettings } : defaultSettings;
+      } catch (e) {
+        return defaultSettings;
+      }
+    };
+
     const Store = {
       state: {
         currentView: 'home',
@@ -149,7 +159,7 @@
         iui: [],
         activeCycle: null,
         calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        settings: JSON.parse(localStorage.getItem('iui_settings')) || { cycleLen: 31, abstainDays: 2 }
+        settings: getSettings()
       },
       set(updates) {
         this.state = { ...this.state, ...updates };
@@ -389,6 +399,7 @@
         const recordDates = new Set([...daily, ...clinic].map(r => Utils.toLocalYYYYMMDD(r.date || r.visit_date)));
         const todayStr = Utils.getTodayStr();
         const preds = App.getPredictions();
+        const periodDates = App.getPeriodDates();
 
         const futurePeriods = preds.futureCycles.map(fc => fc.period);
         const futureIuis = preds.futureCycles.map(fc => fc.iui);
@@ -400,6 +411,7 @@
           const dStr = Utils.toLocalYYYYMMDD(new Date(year, month, i));
           const isToday = dStr === todayStr;
           const hasRec = recordDates.has(dStr);
+          const isPeriod = periodDates.has(dStr);
           
           let eventsHtml = '';
           if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
@@ -410,10 +422,14 @@
           if (futureAbstains.includes(dStr) && dStr !== preds.abstain) eventsHtml += '<span class="text-[10px] opacity-40">🕊</span>';
           if (futurePeriods.includes(dStr) && dStr !== preds.period) eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
 
+          const bgClass = isPeriod ? 'bg-[#FDF2F8]' : (isToday ? 'bg-primary-light/30' : '');
+          const borderClass = isToday ? 'border border-primary' : '';
+          const textClass = isToday ? 'text-primary font-bold' : '';
+
           cells += `
-            <div class="aspect-square flex flex-col items-center pt-1 rounded-xl relative cursor-pointer active:bg-gray-100 transition-colors ${isToday ? 'border border-primary bg-primary-light/30' : ''}" 
+            <div class="aspect-square flex flex-col items-center pt-1 rounded-xl relative cursor-pointer active:bg-gray-100 transition-colors ${bgClass} ${borderClass}" 
                  onclick="App.selectDate('${dStr}')" id="cal-cell-${dStr}">
-              <span class="text-[14px] ${isToday ? 'text-primary font-bold' : ''} leading-none mb-0.5">${i}</span>
+              <span class="text-[14px] ${textClass} leading-none mb-0.5">${i}</span>
               <div class="flex flex-wrap justify-center gap-[1px] leading-none px-0.5">${eventsHtml}</div>
               ${hasRec ? `<div class="w-1 h-1 bg-primary rounded-full absolute bottom-1"></div>` : ''}
             </div>
@@ -551,8 +567,15 @@
                 <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option><option value="2" ${settings.abstainDays==2?'selected':''}>2日</option><option value="3" ${settings.abstainDays==3?'selected':''}>3日</option><option value="4" ${settings.abstainDays==4?'selected':''}>4日</option><option value="5" ${settings.abstainDays==5?'selected':''}>5日</option>
               </select>
             </div>
+            <hr class="border-border/50 my-5">
+            <div>
+              <label class="block text-[13px] text-main mb-2">生理期間 (カレンダー表示用)</label>
+              <select id="set-period-days" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('periodDays', this.value)">
+                <option value="3" ${settings.periodDays==3?'selected':''}>3日間</option><option value="4" ${settings.periodDays==4?'selected':''}>4日間</option><option value="5" ${settings.periodDays==5?'selected':''}>5日間</option><option value="6" ${settings.periodDays==6?'selected':''}>6日間</option><option value="7" ${settings.periodDays==7?'selected':''}>7日間</option>
+              </select>
+            </div>
           </div>
-          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.8 Clean UI & Days</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v3.9 Period Highlight</p></div>
         `;
       }
     };
@@ -906,6 +929,26 @@
         return preds;
       },
 
+      getPeriodDates() {
+        const { cycles, settings } = Store.get();
+        const preds = App.getPredictions();
+        const periodDates = new Set();
+        
+        const addDates = (startStr) => {
+          if (!startStr) return;
+          for (let i = 0; i < settings.periodDays; i++) {
+            const dateStr = Utils.toLocalYYYYMMDD(Utils.addDays(startStr, i));
+            if (dateStr) periodDates.add(dateStr);
+          }
+        };
+
+        cycles.forEach(c => addDates(c.start_date));
+        addDates(preds.period);
+        preds.futureCycles.forEach(fc => addDates(fc.period));
+        
+        return periodDates;
+      },
+
       goToday() {
         const now = new Date();
         Store.set({ calMonth: new Date(now.getFullYear(), now.getMonth(), 1) });
@@ -953,6 +996,12 @@
         if (futureAbstains.includes(dStr) && dStr !== preds.abstain) eventContent += makeEventRow('🕊 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
         if (futurePeriods.includes(dStr) && dStr !== preds.period) eventContent += makeEventRow('🩸 生理予定日 (予測)', 'text-red-400/70', dStr);
 
+        const isPeriod = App.getPeriodDates().has(dStr);
+        const isPeriodStart = Store.get().cycles.some(c => Utils.toLocalYYYYMMDD(c.start_date) === dStr) || dStr === preds.period || futurePeriods.includes(dStr);
+        if (isPeriod && !isPeriodStart) {
+          eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-red-400/70">🩸 生理期間</span><div></div></div>`;
+        }
+
         const { daily, clinic } = Store.get();
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
         const cRec = clinic.find(r => Utils.toLocalYYYYMMDD(r.visit_date) === dStr);
@@ -992,5 +1041,6 @@
   </script>
 </body>
 </html>
+
 
 
