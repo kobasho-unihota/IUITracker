@@ -612,11 +612,16 @@ ${pastDataText}
              if (dStr === aiPred.next_period_date) eventsHtml += '<span class="text-[10px]">✨</span>'; 
           }
 
+          // 禁欲期間のアイコン表示
+          if (isAbstain) eventsHtml += '<span class="text-[10px]">❌</span>';
+
+          const isIUI = iuiDates.includes(dStr) || dStr === preds.iui || futureIuis.includes(dStr);
+
           let bgClass = '';
-          if (isPeriod) {
+          if (isIUI) {
+            bgClass = 'bg-green-50';
+          } else if (isPeriod) {
             bgClass = 'bg-[#FDF2F8]';
-          } else if (isAbstain) {
-            bgClass = 'bg-slate-100';
           } else if (isToday) {
             bgClass = 'bg-primary-light/30';
           }
@@ -1252,9 +1257,9 @@ ${pastDataText}
         }
 
         const isAbstain = App.getAbstainDates().has(dStr);
-        const isAbstainStart = abstainStartDates.includes(dStr) || dStr === preds.abstain || futureAbstains.includes(dStr);
+        
         if (isAbstain) {
-          eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-[#8A6565]/70">🕊 禁欲期間</span><div></div></div>`;
+          eventContent += makeEventRow('❌ 禁欲期間', 'text-[#8A6565]', dStr);
         }
 
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
@@ -1302,6 +1307,9 @@ ${pastDataText}
   </script>
 </body>
 </html>
+
+
+
 
 
 
