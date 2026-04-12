@@ -923,12 +923,13 @@ ${pastDataText}
     };
 
     const Forms = {
-      daily: (id) => {
+      daily: (id, defaultDate) => {
+        const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().daily.find(x => x.id === id) || {};
         return `
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">日付</label>
-            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : Utils.getTodayStr()}" onchange="App.checkExistingDaily(this.value)">
+            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" onchange="App.checkExistingDaily(this.value)">
           </div>
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">基礎体温 (°C)</label>
@@ -938,12 +939,13 @@ ${pastDataText}
           <button onclick="App.submitForm('daily')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
       },
-      clinic: (id) => {
+      clinic: (id, defaultDate) => {
+        const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().clinic.find(x => x.id === id) || {};
         return `
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">受診日</label>
-            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : Utils.getTodayStr()}">
+            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : d}">
           </div>
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">次回受診の指示日</label>
@@ -953,7 +955,8 @@ ${pastDataText}
           <button onclick="App.submitForm('clinic')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
       },
-      iui: (id) => {
+      iui: (id, defaultDate) => {
+        const d = defaultDate || Utils.getTodayStr();
         let r = null;
         if (id) {
           r = Store.get().iui.find(x => x.id === id);
@@ -967,10 +970,15 @@ ${pastDataText}
         r = r || {};
         const isDone = !!r.actual_date;
         
+        let dateVal = d;
+        if (id && r.planned_date) dateVal = Utils.toLocalYYYYMMDD(r.planned_date);
+        else if (defaultDate) dateVal = defaultDate;
+        else if (r.planned_date) dateVal = Utils.toLocalYYYYMMDD(r.planned_date);
+        
         return `
           <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1">予定日</label>
-            <input type="date" id="form-planned" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.planned_date ? Utils.toLocalYYYYMMDD(r.planned_date) : Utils.getTodayStr()}">
+            <input type="date" id="form-planned" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${dateVal}">
           </div>
           
           <div class="mb-8 p-4 bg-gray-50 border border-border rounded-xl flex items-center justify-between">
@@ -988,12 +996,13 @@ ${pastDataText}
           <button onclick="App.submitForm('iui')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
         `;
       },
-      'new-cycle': (id) => {
+      'new-cycle': (id, defaultDate) => {
+        const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().cycles.find(x => x.id === id) || {};
         return `
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">生理開始日</label>
-            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : Utils.getTodayStr()}">
+            <input type="date" id="form-date" class="form-control w-full bg-gray-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : d}">
           </div>
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1">周期タイプ</label>
@@ -1191,9 +1200,9 @@ ${pastDataText}
       
       switchDashTab(tab) { Store.set({ dashTab: tab }); },
 
-      openModal(type, id = null) {
+      openModal(type, id = null, defaultDate = null) {
         document.getElementById('modal-title').innerText = FormTitles[type];
-        document.getElementById('modal-body').innerHTML = Forms[type](id);
+        document.getElementById('modal-body').innerHTML = Forms[type](id, defaultDate);
         
         const overlay = document.getElementById('modal-overlay');
         const sheet = document.getElementById('modal-sheet');
@@ -1500,23 +1509,29 @@ ${pastDataText}
 
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
         const cRec = clinic.find(r => Utils.toLocalYYYYMMDD(r.visit_date) === dStr);
+        const iRec = iui.find(r => Utils.toLocalYYYYMMDD(r.planned_date) === dStr || Utils.toLocalYYYYMMDD(r.actual_date) === dStr);
         
         let content = '';
         if(eventContent) content += `<div class="mb-3 pb-2 border-b border-border/50">${eventContent}</div>`;
         if(dRec) content += `<div class="mb-1 text-[14px]">🌡 体温: <span class="font-bold">${dRec.temperature || '-'}</span> °C</div>`;
-        if(cRec) content += `<div class="text-[14px]">🏥 受診記録あり</div>`;
+        if(cRec) content += `<div class="text-[14px] mb-1">🏥 受診記録あり</div>`;
+        if(iRec && iRec.actual_date) content += `<div class="text-[14px]">🌸 IUI実施済み</div>`;
         
-        const actionHtml = `<button class="w-full mt-4 py-3 rounded-xl border border-primary text-primary font-bold text-sm" onclick="App.openModal('daily', '${dRec?dRec.id:''}')">日次記録を入力・編集</button>`;
+        const actionHtml = `
+          <div class="grid grid-cols-3 gap-2 mt-4">
+            <button class="w-full py-2.5 rounded-xl border border-primary text-primary font-bold text-[12px] bg-primary-light/10 active:bg-primary-light transition-colors" onclick="App.openModal('daily', '${dRec?dRec.id:''}', '${dStr}')">🌡 体温</button>
+            <button class="w-full py-2.5 rounded-xl border border-primary text-primary font-bold text-[12px] bg-primary-light/10 active:bg-primary-light transition-colors" onclick="App.openModal('clinic', '${cRec?cRec.id:''}', '${dStr}')">🏥 通院</button>
+            <button class="w-full py-2.5 rounded-xl border border-primary text-primary font-bold text-[12px] bg-primary-light/10 active:bg-primary-light transition-colors" onclick="App.openModal('iui', '${iRec?iRec.id:''}', '${dStr}')">🌸 IUI</button>
+          </div>
+        `;
 
         document.getElementById('cal-detail-area').innerHTML = `
           <div class="text-sm font-bold text-sub mb-3">${dStr.replace(/-/g, '/')}</div>
-          ${content ? `<div class="bg-card p-4 rounded-[16px] shadow-sm border border-border/20">${content}${actionHtml}</div>` : `<div class="text-sub text-sm">記録なし${actionHtml}</div>`}
+          <div class="bg-card p-4 rounded-[16px] shadow-sm border border-border/20">
+            ${content ? content : `<div class="text-sub text-sm">記録なし</div>`}
+            ${actionHtml}
+          </div>
         `;
-        
-        setTimeout(() => {
-          const dateInput = document.getElementById('form-date');
-          if(dateInput && !document.getElementById('modal-sheet').classList.contains('open')) dateInput.value = dStr;
-        }, 10);
       },
 
       updateSettings(key, val) {
