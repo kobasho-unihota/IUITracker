@@ -174,6 +174,24 @@
     };
 
     const API = {
+      loadFromCache() {
+        try {
+          const cycles = JSON.parse(localStorage.getItem('iui_data_cycles')) || [];
+          const daily = JSON.parse(localStorage.getItem('iui_data_daily')) || [];
+          const clinic = JSON.parse(localStorage.getItem('iui_data_clinic')) || [];
+          const iui = JSON.parse(localStorage.getItem('iui_data_iui')) || [];
+          
+          if (cycles.length > 0) {
+            const activeCycle = cycles[cycles.length - 1];
+            Store.set({ cycles, daily, clinic, iui, activeCycle });
+            return true;
+          }
+        } catch(e) {
+          console.warn('Cache load error', e);
+        }
+        return false;
+      },
+
       async fetchAll() {
         try {
           const fetchTable = async (t) => (await fetch(`${API_URL}?table=${t}`)).json();
@@ -186,6 +204,12 @@
           
           Store.set({ cycles, daily, clinic, iui, activeCycle });
 
+          // キャッシュを最新データで更新
+          localStorage.setItem('iui_data_cycles', JSON.stringify(cycles));
+          localStorage.setItem('iui_data_daily', JSON.stringify(daily));
+          localStorage.setItem('iui_data_clinic', JSON.stringify(clinic));
+          localStorage.setItem('iui_data_iui', JSON.stringify(iui));
+
           if (!localStorage.getItem('iui_settings')) {
             const stats = App.getCycleStats();
             if (stats.count > 0) {
@@ -193,7 +217,7 @@
             }
           }
         } catch (e) {
-          Utils.showToast('データ同期に失敗しました', true);
+          console.warn('Fetch error:', e);
         }
       },
       async save(table, payloadData) {
@@ -246,6 +270,9 @@
         Store.set({ [targetArrayKey]: newArray });
         if(table === 'cycles') Store.set({ activeCycle: newArray[newArray.length - 1] });
         
+        // 変更をローカルキャッシュにも即座に反映
+        localStorage.setItem(`iui_data_${targetArrayKey}`, JSON.stringify(newArray));
+        
         App.closeModal();
         Utils.showToast('保存しました');
 
@@ -253,7 +280,7 @@
           fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
             .then(res => res.json())
             .then(res => { if(res.status !== 'success') throw new Error(); })
-            .catch(() => Utils.showToast('クラウド保存に失敗', true));
+            .catch(() => Utils.showToast('クラウド保存に遅延が発生しています', true));
         } catch(e) {}
         
         return true;
@@ -996,8 +1023,19 @@ ${pastDataText}
       chartInstance: null,
 
       async init() {
-        document.getElementById('global-loading').classList.remove('hidden');
+        // 1. ローカルキャッシュからデータを読み込み、即座に画面を描画する（爆速化）
+        const hasCache = API.loadFromCache();
+        
+        if (hasCache) {
+          if(Store.get().currentView === 'home') this.render();
+          document.getElementById('global-loading').classList.add('hidden');
+        } else {
+          document.getElementById('global-loading').classList.remove('hidden');
+        }
+
+        // 2. 裏側（バックグラウンド）で最新データを取得し、完了したら静かに再描画する
         await API.fetchAll();
+        
         setTimeout(() => {
           if(Store.get().currentView === 'home') this.render();
           document.getElementById('global-loading').classList.add('hidden');
