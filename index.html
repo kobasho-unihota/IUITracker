@@ -162,6 +162,7 @@
         aiPrediction: JSON.parse(localStorage.getItem('iui_ai_prediction')) || null,
         apiKey: localStorage.getItem('iui_gemini_api_key') || '',
         activeCycle: null,
+        selectedCycleId: null,
         calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         settings: getSettings()
       },
@@ -269,8 +270,14 @@
         
         if (!activeCycle) return Utils.showToast('アクティブな周期がありません', true);
         
+        const activeStartDateStr = Utils.toLocalYYYYMMDD(activeCycle.start_date);
+        
+        // 日付ベースで厳密に今周期のデータを抽出
         const cycleDaily = daily
-          .filter(d => d.cycle_id === activeCycle.id && d.temperature)
+          .filter(d => {
+             const dStr = Utils.toLocalYYYYMMDD(d.date);
+             return d.temperature && dStr >= activeStartDateStr;
+          })
           .sort((a, b) => new Date(a.date) - new Date(b.date));
           
         if (cycleDaily.length < 5) return Utils.showToast('予測にはもう少し体温データが必要です（5日分以上）', true);
@@ -297,15 +304,22 @@
               pastDataText += `- 周期開始日(生理日): ${Utils.toLocalYYYYMMDD(startDate)}\n`;
               pastDataText += `- 周期日数: ${cycleLength}日 (次生理日: ${Utils.toLocalYYYYMMDD(nextStartDate)})\n`;
               
-              // IUI実施日を含める
-              const cIui = iui.filter(x => x.cycle_id === c.id).pop();
+              // IUI実施日を含める (日付ベースで判定)
+              const cIui = iui.filter(x => {
+                 const evDate = Utils.toLocalYYYYMMDD(x.actual_date || x.planned_date);
+                 return evDate >= Utils.toLocalYYYYMMDD(startDate) && evDate < Utils.toLocalYYYYMMDD(nextStartDate);
+              }).pop();
+              
               if (cIui && (cIui.actual_date || cIui.planned_date)) {
                  const iuiDate = new Date(cIui.actual_date || cIui.planned_date);
                  pastDataText += `- IUI実施(予定)日: ${Utils.toLocalYYYYMMDD(iuiDate)}\n`;
               }
               
               const pDaily = daily
-                .filter(d => d.cycle_id === c.id && d.temperature)
+                .filter(d => {
+                   const dStr = Utils.toLocalYYYYMMDD(d.date);
+                   return d.temperature && dStr >= Utils.toLocalYYYYMMDD(startDate) && dStr < Utils.toLocalYYYYMMDD(nextStartDate);
+                })
                 .sort((a, b) => new Date(a.date) - new Date(b.date));
               
               if (pDaily.length > 0) {
@@ -322,13 +336,16 @@
           pastDataText = "※過去の周期完了データはまだありません。\n";
         }
 
-        // 今周期のIUI予定/実績を含める
-        const currentIUI = iui.filter(x => x.cycle_id === activeCycle.id).pop();
+        // 今周期のIUI予定/実績を含める (日付ベースで判定)
+        const currentIUI = iui.filter(x => {
+           const evDate = Utils.toLocalYYYYMMDD(x.actual_date || x.planned_date);
+           return evDate >= activeStartDateStr;
+        }).pop();
         let currentIUIText = "";
         if(currentIUI && (currentIUI.actual_date || currentIUI.planned_date)) {
           currentIUIText = `\n【今周期のIUI実施(予定)日】\n${Utils.toLocalYYYYMMDD(currentIUI.actual_date || currentIUI.planned_date)}\n`;
         }
-        
+
         // --- 3. プロンプト作成 ---
         const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期のデータ（基礎体温、IUI実施日）と、過去の周期の実績（IUI実施日、基礎体温推移、次生理日）を総合的に分析し、以下の2点を予測してください。
 
@@ -493,11 +510,9 @@ ${pastDataText}
             `;
           } else {
             const iuiLabel = preds.isPredictedIUI ? 'IUI目安(予測)' : 'IUI実施日(予定)';
-            const abstainLabel = preds.isPredictedIUI ? '禁欲開始(予測)' : '禁欲開始日';
             dashGridHtml = `
               <div class="grid grid-cols-2 gap-y-5 gap-x-6">
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${iuiLabel}</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
-                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${abstainLabel}</span><span class="text-lg font-bold">${preds.abstain ? Utils.formatMMDD(new Date(preds.abstain)) : '-'}</span></div>
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
               </div>
             `;
@@ -509,10 +524,9 @@ ${pastDataText}
             futureHtml += `
               <div class="border-l-[3px] ${opacity} pl-3 mb-4 last:mb-0">
                 <div class="text-[12px] font-bold text-main mb-1.5">${idx + 1}周期先</div>
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-2 gap-2">
                   <div class="flex flex-col"><span class="text-[10px] text-sub mb-0.5">生理予定</span><span class="text-[13px] font-bold">${fc.period ? Utils.formatMMDD(new Date(fc.period)) : '-'}</span></div>
                   <div class="flex flex-col"><span class="text-[10px] text-sub mb-0.5">IUI目安</span><span class="text-[13px] font-bold">${fc.iui ? Utils.formatMMDD(new Date(fc.iui)) : '-'}</span></div>
-                  <div class="flex flex-col"><span class="text-[10px] text-sub mb-0.5">禁欲開始</span><span class="text-[13px] font-bold">${fc.abstain ? Utils.formatMMDD(new Date(fc.abstain)) : '-'}</span></div>
                 </div>
               </div>
             `;
@@ -703,8 +717,51 @@ ${pastDataText}
       },
 
       records: () => {
-        const { daily, clinic } = Store.get();
-        const all = [...daily.map(d => ({...d, type: 'daily'})), ...clinic.map(c => ({...c, type: 'clinic', date: c.visit_date}))];
+        const { daily, clinic, cycles, selectedCycleId, activeCycle } = Store.get();
+        const targetCycleId = selectedCycleId || (activeCycle ? activeCycle.id : null);
+        const targetCycle = cycles.find(c => c.id === targetCycleId);
+
+        let cycleSelectorHtml = '';
+        if (cycles.length > 0) {
+          const options = [...cycles].reverse().map(c => {
+            const sD = Utils.toLocalYYYYMMDD(c.start_date);
+            const isSelected = c.id === targetCycleId ? 'selected' : '';
+            return `<option value="${c.id}" ${isSelected}>${sD.replace(/-/g, '/')} 〜 (${c.type || '未設定'})</option>`;
+          }).join('');
+          
+          cycleSelectorHtml = `
+            <div class="mb-5">
+              <select class="form-control w-full bg-white border border-border rounded-xl px-4 py-3 text-[14px] outline-none font-bold shadow-sm" onchange="App.changeRecordsCycle(this.value)">
+                ${options}
+              </select>
+            </div>
+          `;
+        }
+
+        let startDateStr = '0000-00-00';
+        let endDateStr = '9999-12-31';
+        
+        if (targetCycle) {
+          startDateStr = Utils.toLocalYYYYMMDD(targetCycle.start_date);
+          const sortedCycles = [...cycles].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+          const targetIndex = sortedCycles.findIndex(c => c.id === targetCycleId);
+          // 次の周期があれば、その開始日を終了条件にする
+          if (targetIndex !== -1 && targetIndex < sortedCycles.length - 1) {
+            endDateStr = Utils.toLocalYYYYMMDD(sortedCycles[targetIndex + 1].start_date);
+          }
+        }
+
+        // 選択された周期の日付範囲内のデータのみをフィルタリング
+        const cycleDaily = daily.filter(d => {
+          const dStr = Utils.toLocalYYYYMMDD(d.date);
+          return dStr >= startDateStr && dStr < endDateStr;
+        });
+        const cycleClinic = clinic.filter(c => {
+          const dStr = Utils.toLocalYYYYMMDD(c.visit_date);
+          return dStr >= startDateStr && dStr < endDateStr;
+        });
+
+        const all = [...cycleDaily.map(d => ({...d, type: 'daily'})), ...cycleClinic.map(c => ({...c, type: 'clinic', date: c.visit_date}))];
         all.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         let listHtml = all.map(r => `
@@ -723,22 +780,24 @@ ${pastDataText}
         return `
           <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">記録一覧</h1></div>
           
+          ${cycleSelectorHtml}
+
           <div class="bg-card rounded-[20px] p-5 shadow-sm border border-border/20 mb-8">
             <div class="flex justify-between items-center mb-3">
               <h2 class="text-sm font-bold text-main">基礎体温グラフ</h2>
-              <span class="text-xs text-sub">最新周期</span>
             </div>
             
             <div class="flex gap-4 justify-center mb-4 text-[10px] text-sub">
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rotate-45 bg-[#F4A4A4]"></span>IUI</div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rotate-45 bg-[#F4A4A4]"></span>IUI実施(予定)日</div>
             </div>
             
-            <div class="w-full h-[200px] relative">
-              <canvas id="tempChart"></canvas>
+            <div class="w-full h-[200px] relative flex justify-center items-center">
+              <canvas id="tempChart" class="z-10 absolute inset-0"></canvas>
+              <div id="tempChart-empty" class="text-sub text-xs hidden z-0">体温データがありません</div>
             </div>
           </div>
 
-          <h2 class="text-sm font-bold text-main mb-3 ml-1">すべての記録</h2>
+          <h2 class="text-sm font-bold text-main mb-3 ml-1">この周期の記録</h2>
           <div class="pb-4">${listHtml}</div>
         `;
       },
@@ -964,20 +1023,59 @@ ${pastDataText}
         }
       },
 
+      changeRecordsCycle(id) {
+        Store.set({ selectedCycleId: id });
+      },
+
       renderChart() {
         const canvas = document.getElementById('tempChart');
         if (!canvas) return;
 
-        const { activeCycle, daily } = Store.get();
-        if (!activeCycle) return;
+        const { daily, iui, selectedCycleId, activeCycle, cycles } = Store.get();
+        const targetCycleId = selectedCycleId || (activeCycle ? activeCycle.id : null);
+        const targetCycle = cycles.find(c => c.id === targetCycleId);
+        
+        if (!targetCycle) {
+          if (this.chartInstance) { this.chartInstance.destroy(); this.chartInstance = null; }
+          const emptyEl = document.getElementById('tempChart-empty');
+          if (emptyEl) emptyEl.classList.remove('hidden');
+          return;
+        }
 
-        const preds = App.getPredictions();
+        let startDateStr = Utils.toLocalYYYYMMDD(targetCycle.start_date);
+        let endDateStr = '9999-12-31';
+        
+        const sortedCycles = [...cycles].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+        const targetIndex = sortedCycles.findIndex(c => c.id === targetCycleId);
+        if (targetIndex !== -1 && targetIndex < sortedCycles.length - 1) {
+          endDateStr = Utils.toLocalYYYYMMDD(sortedCycles[targetIndex + 1].start_date);
+        }
 
+        // 日付範囲でフィルタリング
         const cycleDaily = daily
-          .filter(d => d.cycle_id === activeCycle.id && d.temperature)
+          .filter(d => {
+             const dStr = Utils.toLocalYYYYMMDD(d.date);
+             return d.temperature && dStr >= startDateStr && dStr < endDateStr;
+          })
           .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        if (cycleDaily.length === 0) return;
+        if (cycleDaily.length === 0) {
+          if (this.chartInstance) { this.chartInstance.destroy(); this.chartInstance = null; }
+          const emptyEl = document.getElementById('tempChart-empty');
+          if (emptyEl) emptyEl.classList.remove('hidden');
+          return;
+        }
+
+        const emptyEl = document.getElementById('tempChart-empty');
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        // その周期のIUI実施(予定)日を取得 (日付範囲でフィルタリング)
+        const cycleIuiDates = iui
+          .filter(ev => {
+             const dStr = Utils.toLocalYYYYMMDD(ev.actual_date || ev.planned_date);
+             return dStr && dStr >= startDateStr && dStr < endDateStr;
+          })
+          .map(ev => Utils.toLocalYYYYMMDD(ev.actual_date || ev.planned_date));
 
         const labels = [];
         const data = [];
@@ -994,7 +1092,7 @@ ${pastDataText}
           let radius = 4;
           let style = 'circle';
 
-          if (dStr === preds.actual || dStr === preds.iui) {
+          if (cycleIuiDates.includes(dStr)) {
             color = '#F4A4A4';
             radius = 8;
             style = 'rectRot';
@@ -1346,15 +1444,20 @@ ${pastDataText}
         }
 
         const isAbstain = App.getAbstainDates().has(dStr);
-        const isAbstainStart = abstainStartDates.includes(dStr) || dStr === preds.abstain || futureAbstains.includes(dStr);
-        
-        if (abstainStartDates.includes(dStr)) eventContent += makeEventRow('❌ 禁欲開始日', 'text-[#8A6565]', dStr);
-        else if (dStr === preds.abstain && !preds.isPredictedIUI) eventContent += makeEventRow('❌ 禁欲開始日', 'text-[#8A6565]', dStr);
-        else if (dStr === preds.abstain && preds.isPredictedIUI) eventContent += makeEventRow('❌ 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
-        else if (futureAbstains.includes(dStr)) eventContent += makeEventRow('❌ 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
         
         if (isAbstain) {
-          eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-[#8A6565]/70">❌ 禁欲期間</span><div></div></div>`;
+          // 確定した予定（実績または手動入力されたIUI予定）に基づく禁欲期間かどうかを判定
+          const isConfirmed = abstainStartDates.some(sd => {
+             const ev = iui.find(x => Utils.toLocalYYYYMMDD(Utils.addDays(x.planned_date, -settings.abstainDays)) === sd);
+             if(ev && dStr >= sd && dStr < Utils.toLocalYYYYMMDD(ev.planned_date)) return true;
+             return false;
+          }) || (dStr >= preds.abstain && dStr < preds.iui && !preds.isPredictedIUI);
+
+          if (isConfirmed) {
+            eventContent += makeEventRow('❌ 禁欲期間', 'text-[#8A6565]', dStr);
+          } else {
+            eventContent += makeEventRow('❌ 禁欲期間 (予測)', 'text-[#8A6565]/70', dStr);
+          }
         }
 
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
