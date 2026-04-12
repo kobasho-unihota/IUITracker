@@ -11,8 +11,10 @@
   <meta name="apple-mobile-web-app-title" content="にんサポ">
   <meta name="theme-color" content="#D4A5A5">
   
-  <link rel="apple-touch-icon" href="./icon.png">
-  <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;にんサポ&quot;,&quot;short_name&quot;:&quot;にんサポ&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#FDFBFB&quot;,&quot;theme_color&quot;:&quot;#D4A5A5&quot;}">
+  <!-- 新しいアイコン: ほたて君とうに君がくっついて寝ている姿を抽象化したデザイン -->
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA1MTIgNTEyJz48cmVjdCB3aWR0aD0nNTEyJyBoZWlnaHQ9JzUxMicgcng9JzExMicgZmlsbD0nI2ZmZmZmZicvPjxjaXJjbGUgY3g9JzIxNicgY3k9JzI1Nicgcj0nMTIwJyBmaWxsPScjRDRBNUE1JyBvcGFjaXR5PScwLjcnLz48Y2lyY2xlIGN4PTI5NicgY3k9JzI1Nicgcj0nMTIwJyBmaWxsPScjRkZCNzhDJyBvcGFjaXR5PScwLjcnLz48L3N2Zz4=" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA1MTIgNTEyJz48cmVjdCB3aWR0aD0nNTEyJyBoZWlnaHQ9JzUxMicgcng9JzExMicgZmlsbD0nI2ZmZmZmZicvPjxjaXJjbGUgY3g9JzIxNicgY3k9JzI1Nicgcj0nMTIwJyBmaWxsPScjRDRBNUE1JyBvcGFjaXR5PScwLjcnLz48Y2lyY2xlIGN4PTI5NicgY3k9JzI1Nicgcj0nMTIwJyBmaWxsPScjRkZCNzhDJyBvcGFjaXR5PScwLjcnLz48L3N2Zz4=">
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%E3%81%AB%E3%82%93%E3%82%B5%E3%83%9D%22%2C%22short_name%22%3A%22%E3%81%AB%E3%82%93%E3%82%B5%E3%83%9D%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23FDFBFB%22%2C%22theme_color%22%3A%22%23D4A5A5%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA1MTIgNTEyJz48cmVjdCB3aWR0aD0nNTEyJyBoZWlnaHQ9JzUxMicgcng9JzExMicgZmlsbD0nI2ZmZmZmZicvPjxjaXJjbGUgY3g9JzIxNicgY3k9JzI1Nicgcj0nMTIwJyBmaWxsPScjRDRBNUE1JyBvcGFjaXR5PScwLjcnLz48Y2lyY2xlIGN4PTI5NicgY3k9JzI1Nicgcj0nMTIwJyBmaWxsPScjRkZCNzhDJyBvcGFjaXR5PScwLjcnLz48L3N2Zz4%3D%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -283,9 +285,8 @@
         const pastCycles = cycles.filter(c => c.id !== activeCycle.id).slice(-3); // 直近3周期に限定
         
         if (pastCycles.length > 0) {
-          pastDataText += "【過去の周期の傾向（参考データ）】\n";
+          pastDataText += "【過去の周期の実績（参考データ）】\n";
           pastCycles.forEach((c, index) => {
-            // 次の周期の開始日＝この周期の次の生理日
             const nextC = cycles.find(nc => new Date(nc.start_date) > new Date(c.start_date));
             if (nextC) {
               const startDate = new Date(c.start_date);
@@ -295,6 +296,13 @@
               pastDataText += `[過去周期 ${index + 1}]\n`;
               pastDataText += `- 周期開始日(生理日): ${Utils.toLocalYYYYMMDD(startDate)}\n`;
               pastDataText += `- 周期日数: ${cycleLength}日 (次生理日: ${Utils.toLocalYYYYMMDD(nextStartDate)})\n`;
+              
+              // IUI実施日を含める
+              const cIui = iui.filter(x => x.cycle_id === c.id).pop();
+              if (cIui && (cIui.actual_date || cIui.planned_date)) {
+                 const iuiDate = new Date(cIui.actual_date || cIui.planned_date);
+                 pastDataText += `- IUI実施(予定)日: ${Utils.toLocalYYYYMMDD(iuiDate)}\n`;
+              }
               
               const pDaily = daily
                 .filter(d => d.cycle_id === c.id && d.temperature)
@@ -307,22 +315,30 @@
               pastDataText += "\n";
             }
           });
-          if (pastDataText === "【過去の周期の傾向（参考データ）】\n") {
+          if (pastDataText === "【過去の周期の実績（参考データ）】\n") {
              pastDataText = "※過去の周期完了データ（次の生理が来た記録）はまだありません。\n";
           }
         } else {
           pastDataText = "※過去の周期完了データはまだありません。\n";
         }
+
+        // 今周期のIUI予定/実績を含める
+        const currentIUI = iui.filter(x => x.cycle_id === activeCycle.id).pop();
+        let currentIUIText = "";
+        if(currentIUI && (currentIUI.actual_date || currentIUI.planned_date)) {
+          currentIUIText = `\n【今周期のIUI実施(予定)日】\n${Utils.toLocalYYYYMMDD(currentIUI.actual_date || currentIUI.planned_date)}\n`;
+        }
         
         // --- 3. プロンプト作成 ---
-        const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期の基礎体温データと、過去の周期の傾向（基礎体温推移と次生理日）を参考に、以下の2点を分析・予測してください。
+        const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期のデータ（基礎体温、IUI実施日）と、過去の周期の実績（IUI実施日、基礎体温推移、次生理日）を総合的に分析し、以下の2点を予測してください。
 
 1. 今周期の「低温相から高温相へ移行したタイミング（推測・排卵日）」
-2. 「推測・排卵日から推測される次回の生理予定日」
-※生理予定日の予測には、一般的な14日固定ではなく、必ず【過去の周期の傾向】の基礎体温データから「過去の排卵日（低温相から高温相への移行）から次の生理日までの実際の日数（黄体期の長さ）」をあなた自身で分析・学習し、その傾向を最優先で加算してください。過去データがない場合のみ14日として計算してください。
+2. 「推測・排卵日 または IUI実施日 から推測される次回の生理予定日」
+※生理予定日の予測には、一般的な14日固定ではなく、必ず【過去の周期の実績】から「IUI実施日（または排卵日）から次の生理日までの実際の日数（黄体期の長さ）」の平均や傾向を算出し、それを最優先で加算してください。過去データがない場合のみ14日として計算してください。
 
 【今周期の基礎体温データ】
 ${dataText}
+${currentIUIText}
 
 ${pastDataText}
 
@@ -330,7 +346,7 @@ ${pastDataText}
 {
   "ovulation_date": "YYYY-MM-DD",
   "next_period_date": "YYYY-MM-DD",
-  "reason": "推測の理由やアドバイス（2〜3文）。医師のような専門的かつ丁寧で落ち着いた口調で記述してください。次回の生理予定日の算出根拠（過去の体温推移から黄体期を何日間と推定したか等）も含めてください。"
+  "reason": "推測の理由やアドバイス（2〜3文）。医師のような専門的かつ丁寧で落ち着いた口調で記述してください。次回の生理予定日の算出根拠（過去のIUI実施日からの日数や、体温推移から黄体期を何日間と推定したか等）も含めてください。"
 }`;
 
         const payload = {
@@ -340,7 +356,7 @@ ${pastDataText}
           }
         };
 
-        // --- 4. 利用可能なモデルの自動検索とフォールバック実行 ---
+        // --- 4. 利用可能なモデルの自動検索とフォールバック・リトライ実行 ---
         try {
           const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
           const modelsRes = await fetch(modelsUrl);
@@ -359,40 +375,65 @@ ${pastDataText}
              throw new Error('利用可能なGeminiモデルが見つかりません');
           }
 
-          const bestModel = available.find(m => m.name.includes('2.5-flash')) ||
-                            available.find(m => m.name.includes('2.0-flash')) ||
-                            available.find(m => m.name.includes('1.5-flash')) ||
+          // 安定して優秀なモデルを優先的に選択
+          const bestModel = available.find(m => m.name.includes('1.5-flash')) ||
+                            available.find(m => m.name.includes('2.5-flash')) ||
                             available.find(m => m.name.includes('flash')) ||
                             available[0];
                             
           const targetModelName = bestModel.name.replace('models/', '');
-          
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${apiKey}`;
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const result = await res.json();
           
-          if (result.error) {
-             throw new Error(result.error.message);
+          // サーバー混雑対策：エラー時に待機して最大5回再試行する（エクスポネンシャル・バックオフ）
+          const retryDelays = [1000, 2000, 4000, 8000, 16000];
+          let resultText = null;
+          let lastError = null;
+
+          for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+            try {
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const result = await res.json();
+              
+              if (result.error) {
+                 throw new Error(result.error.message);
+              }
+              
+              const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                resultText = text;
+                break; // 成功したらループを抜ける
+              } else {
+                 throw new Error('AIからデータが返却されませんでした');
+              }
+            } catch (err) {
+              lastError = err;
+              console.warn(`AIアクセス試行 ${attempt + 1}回目 失敗:`, err.message);
+              // まだリトライ回数が残っていれば待機する
+              if (attempt < retryDelays.length) {
+                await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+              }
+            }
           }
+
+          // リトライを全て失敗した場合
+          if (!resultText) {
+             throw new Error(`サーバーが混雑しています。時間をおいて再試行してください (${lastError?.message || '不明なエラー'})`);
+          }
+
+          const cleanText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const aiPred = JSON.parse(cleanText);
+          aiPred.cycle_id = activeCycle.id;
+          Store.set({ aiPrediction: aiPred });
+          localStorage.setItem('iui_ai_prediction', JSON.stringify(aiPred));
+          Utils.showToast('AIの分析が完了しました✨');
           
-          const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            const aiPred = JSON.parse(cleanText);
-            aiPred.cycle_id = activeCycle.id;
-            Store.set({ aiPrediction: aiPred });
-            localStorage.setItem('iui_ai_prediction', JSON.stringify(aiPred));
-            Utils.showToast('AIの分析が完了しました✨');
-          } else {
-             throw new Error('AIからデータが返却されませんでした');
-          }
         } catch (e) {
           console.error(e);
-          Utils.showToast(`エラー: ${e.message.substring(0, 40)}...`, true);
+          Utils.showToast(`エラー: ${e.message.substring(0, 45)}...`, true);
         } finally {
           document.getElementById('global-loading').classList.add('hidden');
         }
@@ -451,10 +492,12 @@ ${pastDataText}
               </div>
             `;
           } else {
+            const iuiLabel = preds.isPredictedIUI ? 'IUI目安(予測)' : 'IUI実施日(予定)';
+            const abstainLabel = preds.isPredictedIUI ? '禁欲開始(予測)' : '禁欲開始日';
             dashGridHtml = `
               <div class="grid grid-cols-2 gap-y-5 gap-x-6">
-                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(予定)</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
-                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">禁欲開始日</span><span class="text-lg font-bold">${preds.abstain ? Utils.formatMMDD(new Date(preds.abstain)) : '-'}</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${iuiLabel}</span><span class="text-lg font-bold">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${abstainLabel}</span><span class="text-lg font-bold">${preds.abstain ? Utils.formatMMDD(new Date(preds.abstain)) : '-'}</span></div>
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
               </div>
             `;
@@ -480,7 +523,7 @@ ${pastDataText}
               ${futureHtml}
             </div>
             <div class="mt-4 p-3 bg-gray-50 rounded-xl text-[10px] text-sub leading-relaxed">
-              ※今周期の実績と設定から算出した参考スケジュールです。<br>IUI目安は今周期の実績日数を基に算出しています。
+              ※過去の実績傾向（IUIのタイミングや生理までの日数）を自動学習して算出しています。
             </div>
           `;
         }
@@ -526,7 +569,7 @@ ${pastDataText}
           tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50" onclick="App.openModal('daily')"><div class="w-2 h-2 rounded-full bg-primary mr-3"></div><span class="font-medium">基礎体温を記録しましょう <span class="text-gray-300 ml-1">›</span></span></div>`);
         }
 
-        if (preds.iui && !preds.isIUIDone) {
+        if (preds.iui && !preds.isIUIDone && !preds.isPredictedIUI) {
           if (today === preds.iui) {
             tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50 border-t border-border/50" onclick="App.openModal('iui')"><div class="w-2 h-2 rounded-full bg-red-400 mr-3"></div><span class="font-medium text-red-500">本日IUI予定日です。結果を記録 <span class="text-gray-300 ml-1">›</span></span></div>`);
           } else if (today < preds.iui && preds.abstain && today >= preds.abstain) {
@@ -598,7 +641,8 @@ ${pastDataText}
           let eventsHtml = '';
           // IUI
           if (iuiDates.includes(dStr)) eventsHtml += '<span class="text-[10px]">🌸</span>';
-          else if (dStr === preds.iui) eventsHtml += '<span class="text-[10px]">🌸</span>';
+          else if (dStr === preds.iui && !preds.isPredictedIUI) eventsHtml += '<span class="text-[10px]">🌸</span>';
+          else if (dStr === preds.iui && preds.isPredictedIUI) eventsHtml += '<span class="text-[10px] opacity-40">🌸</span>';
           else if (futureIuis.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">🌸</span>';
           
           // 生理開始
@@ -615,7 +659,7 @@ ${pastDataText}
           // 禁欲期間のアイコン表示
           if (isAbstain) eventsHtml += '<span class="text-[10px]">❌</span>';
 
-          const isIUI = iuiDates.includes(dStr) || dStr === preds.iui || futureIuis.includes(dStr);
+          const isIUI = iuiDates.includes(dStr) || (dStr === preds.iui && !preds.isPredictedIUI);
 
           let bgClass = '';
           if (isIUI) {
@@ -787,7 +831,7 @@ ${pastDataText}
             </div>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-gray-300 pb-10"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v4.2 AI with History</p></div>
+          <div class="mt-12 text-center text-[10px] text-gray-300 pb-10"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v4.5 Smart History</p></div>
         `;
       }
     };
@@ -1094,20 +1138,56 @@ ${pastDataText}
       },
 
       getPredictions() {
-        const { activeCycle, iui, settings } = Store.get();
+        const { activeCycle, iui, settings, cycles } = Store.get();
         let preds = { 
-          iui: null, abstain: null, period: null, isIUIDone: false, actual: null, 
+          iui: null, abstain: null, period: null, isIUIDone: false, actual: null, isPredictedIUI: false,
           futureCycles: [] 
         };
         if (!activeCycle) return preds;
+
+        // --- 過去の実績から平均日数を算出 ---
+        let totalIuiPhase = 0;
+        let countIuiPhase = 0;
+        let totalLutealPhase = 0;
+        let countLutealPhase = 0;
+
+        cycles.forEach(c => {
+          if (c.id === activeCycle.id) return; // 過去周期のみ
+          const cIuis = iui.filter(x => x.cycle_id === c.id);
+          const cIui = cIuis[cIuis.length - 1]; // その周期の最新IUI
+          const nextC = cycles.find(nc => new Date(nc.start_date) > new Date(c.start_date));
+
+          if (cIui && (cIui.actual_date || cIui.planned_date)) {
+            const iuiDate = new Date(cIui.actual_date || cIui.planned_date);
+            const startDate = new Date(c.start_date);
+            const iuiPhase = Math.floor((iuiDate - startDate) / 86400000);
+            if (iuiPhase > 0 && iuiPhase < 40) {
+              totalIuiPhase += iuiPhase;
+              countIuiPhase++;
+            }
+            if (nextC) {
+              const nextStartDate = new Date(nextC.start_date);
+              const lutealPhase = Math.floor((nextStartDate - iuiDate) / 86400000);
+              if (lutealPhase > 0 && lutealPhase < 25) {
+                totalLutealPhase += lutealPhase;
+                countLutealPhase++;
+              }
+            }
+          }
+        });
+
+        // 実績があれば平均を採用、なければ設定値からフォールバック
+        const avgIuiPhase = countIuiPhase > 0 ? Math.round(totalIuiPhase / countIuiPhase) : (settings.cycleLen > 14 ? settings.cycleLen - 14 : 14);
+        const avgLutealPhase = countLutealPhase > 0 ? Math.round(totalLutealPhase / countLutealPhase) : 14;
         
+        // --- 今回周期の予測 ---
         const cycleIUI = iui.filter(i => i.cycle_id === activeCycle.id);
         const latestIUI = cycleIUI[cycleIUI.length - 1];
         
         const startD = activeCycle.start_date;
-        preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(startD, settings.cycleLen));
         
-        if (latestIUI) {
+        // IUIが確定しているかどうか
+        if (latestIUI && (latestIUI.planned_date || latestIUI.actual_date)) {
           preds.isIUIDone = !!latestIUI.actual_date;
           if (latestIUI.planned_date) {
             preds.iui = Utils.toLocalYYYYMMDD(latestIUI.planned_date);
@@ -1116,19 +1196,27 @@ ${pastDataText}
           if (preds.isIUIDone) {
             preds.actual = Utils.toLocalYYYYMMDD(latestIUI.actual_date);
           }
+          // 生理予定日は、確定したIUI日 + 平均黄体期
+          const baseIuiDate = preds.actual || preds.iui;
+          preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(baseIuiDate, avgLutealPhase));
+        } else {
+          // 未確定の場合は開始日 + 平均IUIフェーズ
+          const estIui = Utils.addDays(startD, avgIuiPhase);
+          preds.iui = Utils.toLocalYYYYMMDD(estIui);
+          preds.abstain = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, -settings.abstainDays));
+          preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, avgLutealPhase));
+          preds.isPredictedIUI = true;
         }
         
+        // --- 未来の周期の予測 ---
         if (preds.period) {
-          let iuiCycleDays = 14; 
-          if (preds.actual || preds.iui) {
-            const targetIuiDate = new Date(preds.actual || preds.iui);
-            iuiCycleDays = Math.floor((targetIuiDate - new Date(startD)) / 86400000);
-          }
-          
           for (let i = 1; i <= 3; i++) {
-            const fPeriodObj = Utils.addDays(startD, settings.cycleLen * i);
-            const fIuiObj = Utils.addDays(fPeriodObj, iuiCycleDays);
+            // 前の周期の生理予定日を起点とする
+            const prevPeriodObj = i === 1 ? new Date(preds.period) : new Date(preds.futureCycles[i - 2].period);
+            
+            const fIuiObj = Utils.addDays(prevPeriodObj, avgIuiPhase);
             const fAbstainObj = fIuiObj ? Utils.addDays(fIuiObj, -settings.abstainDays) : null;
+            const fPeriodObj = Utils.addDays(fIuiObj, avgLutealPhase);
             
             preds.futureCycles.push({
               period: Utils.toLocalYYYYMMDD(fPeriodObj),
@@ -1238,7 +1326,8 @@ ${pastDataText}
         `;
         
         if (iuiDates.includes(dStr)) eventContent += makeEventRow('🌸 IUI実施日', 'text-[#B07B7B]', dStr);
-        else if (dStr === preds.iui) eventContent += makeEventRow('🌸 IUI実施予定日', 'text-[#B07B7B]', dStr);
+        else if (dStr === preds.iui && !preds.isPredictedIUI) eventContent += makeEventRow('🌸 IUI実施予定日', 'text-[#B07B7B]', dStr);
+        else if (dStr === preds.iui && preds.isPredictedIUI) eventContent += makeEventRow('🌸 IUI目安 (予測)', 'text-[#B07B7B]/70', dStr);
         else if (futureIuis.includes(dStr)) eventContent += makeEventRow('🌸 IUI目安 (予測)', 'text-[#B07B7B]/70', dStr);
         
         if (cycleStarts.includes(dStr)) eventContent += makeEventRow('🩸 生理開始日', 'text-red-400', dStr);
@@ -1257,9 +1346,15 @@ ${pastDataText}
         }
 
         const isAbstain = App.getAbstainDates().has(dStr);
+        const isAbstainStart = abstainStartDates.includes(dStr) || dStr === preds.abstain || futureAbstains.includes(dStr);
+        
+        if (abstainStartDates.includes(dStr)) eventContent += makeEventRow('❌ 禁欲開始日', 'text-[#8A6565]', dStr);
+        else if (dStr === preds.abstain && !preds.isPredictedIUI) eventContent += makeEventRow('❌ 禁欲開始日', 'text-[#8A6565]', dStr);
+        else if (dStr === preds.abstain && preds.isPredictedIUI) eventContent += makeEventRow('❌ 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
+        else if (futureAbstains.includes(dStr)) eventContent += makeEventRow('❌ 禁欲開始 (予測)', 'text-[#8A6565]/70', dStr);
         
         if (isAbstain) {
-          eventContent += makeEventRow('❌ 禁欲期間', 'text-[#8A6565]', dStr);
+          eventContent += `<div class="mb-2 flex justify-between items-center"><span class="text-[13px] font-bold text-[#8A6565]/70">❌ 禁欲期間</span><div></div></div>`;
         }
 
         const dRec = daily.find(r => Utils.toLocalYYYYMMDD(r.date) === dStr);
@@ -1307,11 +1402,3 @@ ${pastDataText}
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
