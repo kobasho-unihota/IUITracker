@@ -309,10 +309,12 @@
 
         document.getElementById('global-loading').classList.remove('hidden');
         
-        // 基礎体温データ
-        const dataText = cycleDaily.map(d => `${Utils.toLocalYYYYMMDD(d.date)}: ${d.temperature}度`).join('\n');
+        const dataText = cycleDaily.map(d => {
+            let txt = `${Utils.toLocalYYYYMMDD(d.date)}: ${d.temperature}度`;
+            if (d.memo) txt += ` (メモ: ${d.memo})`;
+            return txt;
+        }).join('\n');
         
-        // ユーザーからの補足メモ（UIから取得）
         const aiMemoInput = document.getElementById('ai-memo-input');
         const userMemo = aiMemoInput ? aiMemoInput.value.trim() : (localStorage.getItem(`iui_ai_memo_${activeCycle.id}`) || '');
         let userMemoText = "";
@@ -376,7 +378,7 @@
           currentIUIText = `\n【今周期のIUI実施(予定)日】\n${Utils.toLocalYYYYMMDD(currentIUI.actual_date || currentIUI.planned_date)}\n`;
         }
 
-        const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期のデータ（基礎体温、IUI実施日）と、過去の周期の実績を総合的に分析し、以下の2点を予測してください。
+        const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期のデータ（基礎体温、メモ内容、IUI実施日）と、過去の周期の実績を総合的に分析し、以下の2点を予測してください。
 
 1. 今周期の「低温相から高温相へ移行したタイミング（推測・排卵日）」
 2. 「推測・排卵日 または IUI実施日 から推測される次回の生理予定日」
@@ -531,7 +533,7 @@ ${pastDataText}
               <div class="grid grid-cols-2 gap-y-5 gap-x-6">
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(済)</span><span class="text-lg font-bold text-blue-600">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI後経過</span><span class="text-lg font-bold text-main">${passedDays}<span class="text-[12px] font-normal text-sub ml-1">日目</span></span></div>
-                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold text-rose-500">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${preds.isAIPeriod ? '次回生理予定(AI)' : '次回生理予定'}</span><span class="text-lg font-bold text-rose-500">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
               </div>
             `;
           } else {
@@ -539,7 +541,7 @@ ${pastDataText}
             dashGridHtml = `
               <div class="grid grid-cols-2 gap-y-5 gap-x-6">
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${iuiLabel}</span><span class="text-lg font-bold text-blue-600">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
-                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">次回生理予定</span><span class="text-lg font-bold text-rose-500">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${preds.isAIPeriod ? '次回生理予定(AI)' : '次回生理予定'}</span><span class="text-lg font-bold text-rose-500">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
               </div>
             `;
           }
@@ -693,12 +695,11 @@ ${pastDataText}
           else if (futureIuis.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">📌</span>';
           
           if (cycleStarts.includes(dStr)) eventsHtml += '<span class="text-[10px]">🩸</span>';
-          else if (dStr === preds.period) eventsHtml += '<span class="text-[10px]">🩸</span>';
+          else if (dStr === preds.period) eventsHtml += `<span class="text-[10px]">${preds.isAIPeriod ? '✨' : '🩸'}</span>`;
           else if (futurePeriods.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
           
           if (aiPred && aiPred.cycle_id === Store.get().activeCycle?.id) {
              if (dStr === aiPred.ovulation_date) eventsHtml += '<span class="text-[10px]">🥚</span>'; 
-             if (dStr === aiPred.next_period_date) eventsHtml += '<span class="text-[10px]">✨</span>'; 
           }
 
           if (isAbstain) eventsHtml += '<span class="text-[10px]">❌</span>';
@@ -920,7 +921,7 @@ ${pastDataText}
             </div>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.1 Smart Analytics</p></div>
+          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.2 Smart Analytics Integration</p></div>
         `;
       }
     };
@@ -1083,7 +1084,7 @@ ${pastDataText}
         const canvas = document.getElementById('tempChart');
         if (!canvas) return;
 
-        const { daily, iui, selectedCycleId, activeCycle, cycles } = Store.get();
+        const { daily, iui, selectedCycleId, activeCycle, cycles, aiPrediction } = Store.get();
         const targetCycleId = selectedCycleId || (activeCycle ? activeCycle.id : null);
         const targetCycle = cycles.find(c => c.id === targetCycleId);
         
@@ -1103,8 +1104,13 @@ ${pastDataText}
         if (targetIndex !== -1 && targetIndex < sortedCycles.length - 1) {
           endDateStr = Utils.toLocalYYYYMMDD(sortedCycles[targetIndex + 1].start_date);
         } else {
-          const preds = App.getPredictions();
-          endDateStr = preds.period ? preds.period : Utils.toLocalYYYYMMDD(Utils.addDays(startDateStr, Store.get().settings.cycleLen));
+          // ▼ グラフの終了日にもAIの予測日を反映する
+          if (aiPrediction && aiPrediction.cycle_id === targetCycleId && aiPrediction.next_period_date) {
+            endDateStr = Utils.toLocalYYYYMMDD(aiPrediction.next_period_date);
+          } else {
+            const preds = App.getPredictions();
+            endDateStr = preds.period ? preds.period : Utils.toLocalYYYYMMDD(Utils.addDays(startDateStr, Store.get().settings.cycleLen));
+          }
         }
 
         const cycleDaily = daily
@@ -1302,9 +1308,9 @@ ${pastDataText}
       },
 
       getPredictions() {
-        const { activeCycle, iui, settings, cycles } = Store.get();
+        const { activeCycle, iui, settings, cycles, aiPrediction } = Store.get();
         let preds = { 
-          iui: null, abstain: null, period: null, isIUIDone: false, actual: null, isPredictedIUI: false,
+          iui: null, abstain: null, period: null, isIUIDone: false, actual: null, isPredictedIUI: false, isAIPeriod: false,
           futureCycles: [] 
         };
         if (!activeCycle) return preds;
@@ -1364,6 +1370,12 @@ ${pastDataText}
           preds.abstain = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, -settings.abstainDays));
           preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, avgLutealPhase));
           preds.isPredictedIUI = true;
+        }
+
+        // ▼ AI予測が存在し、排卵日が推測されている場合は生理予定日を上書き
+        if (aiPrediction && aiPrediction.cycle_id === activeCycle.id && aiPrediction.ovulation_date && aiPrediction.next_period_date) {
+            preds.period = Utils.toLocalYYYYMMDD(aiPrediction.next_period_date);
+            preds.isAIPeriod = true;
         }
         
         if (preds.period) {
@@ -1486,13 +1498,13 @@ ${pastDataText}
         else if (dStr === preds.iui && preds.isPredictedIUI) eventContent += makeEventRow('📌 IUI目安 (予測)', 'text-blue-500/70', dStr);
         else if (futureIuis.includes(dStr)) eventContent += makeEventRow('📌 IUI目安 (予測)', 'text-blue-500/70', dStr);
         
+        // ▼ AI予測の場合は表示を切り替える
         if (cycleStarts.includes(dStr)) eventContent += makeEventRow('🩸 生理開始日', 'text-rose-500', dStr);
-        else if (dStr === preds.period) eventContent += makeEventRow('🩸 次回生理予定日', 'text-rose-500', dStr);
+        else if (dStr === preds.period) eventContent += makeEventRow(preds.isAIPeriod ? '✨ 次回生理予定 (AI分析)' : '🩸 次回生理予定日', 'text-rose-500', dStr);
         else if (futurePeriods.includes(dStr)) eventContent += makeEventRow('🩸 生理予定日 (予測)', 'text-rose-500/70', dStr);
 
         if (aiPred && aiPred.cycle_id === Store.get().activeCycle?.id) {
           if (dStr === aiPred.ovulation_date) eventContent += makeEventRow('🥚 排卵日 (AI推測)', 'text-teal-600', dStr);
-          if (dStr === aiPred.next_period_date) eventContent += makeEventRow('✨ 次回生理予定 (AI予測)', 'text-rose-500', dStr);
         }
 
         const isPeriod = App.getPeriodDates().has(dStr);
