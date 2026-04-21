@@ -309,12 +309,17 @@
 
         document.getElementById('global-loading').classList.remove('hidden');
         
-        const dataText = cycleDaily.map(d => {
-            let txt = `${Utils.toLocalYYYYMMDD(d.date)}: ${d.temperature}度`;
-            if (d.memo) txt += ` (メモ: ${d.memo})`;
-            return txt;
-        }).join('\n');
+        // 基礎体温データ
+        const dataText = cycleDaily.map(d => `${Utils.toLocalYYYYMMDD(d.date)}: ${d.temperature}度`).join('\n');
         
+        // ユーザーからの補足メモ（UIから取得）
+        const aiMemoInput = document.getElementById('ai-memo-input');
+        const userMemo = aiMemoInput ? aiMemoInput.value.trim() : (localStorage.getItem(`iui_ai_memo_${activeCycle.id}`) || '');
+        let userMemoText = "";
+        if (userMemo) {
+            userMemoText = `\n【ユーザーからの補足メモ（この周期に関する特記事項）】\n${userMemo}\n`;
+        }
+
         let pastDataText = "";
         const pastCycles = cycles.filter(c => c.id !== activeCycle.id).slice(-3);
         
@@ -371,15 +376,17 @@
           currentIUIText = `\n【今周期のIUI実施(予定)日】\n${Utils.toLocalYYYYMMDD(currentIUI.actual_date || currentIUI.planned_date)}\n`;
         }
 
-        const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期のデータ（基礎体温、メモ内容、IUI実施日）と、過去の周期の実績を総合的に分析し、以下の2点を予測してください。
+        const prompt = `あなたは不妊治療をサポートするAIアシスタントです。以下の今周期のデータ（基礎体温、IUI実施日）と、過去の周期の実績を総合的に分析し、以下の2点を予測してください。
 
 1. 今周期の「低温相から高温相へ移行したタイミング（推測・排卵日）」
 2. 「推測・排卵日 または IUI実施日 から推測される次回の生理予定日」
 ※生理予定日の予測には、一般的な14日固定ではなく、必ず【過去の周期の実績】から平均や傾向を算出し、それを最優先で加算してください。過去データがない場合のみ14日として計算してください。
+${userMemoText ? '※補足メモがある場合は、その内容も推測の材料や理由コメントへの反映に活用してください。' : ''}
 
 【今周期のデータ】
 ${dataText}
 ${currentIUIText}
+${userMemoText}
 
 ${pastDataText}
 
@@ -564,6 +571,7 @@ ${pastDataText}
         let aiHtml = '';
         const aiPred = Store.get().aiPrediction;
         const cycleDailyForAI = daily.filter(d => d.cycle_id === activeCycle.id && d.temperature);
+        const savedAiMemo = localStorage.getItem(`iui_ai_memo_${activeCycle.id}`) || '';
         
         if (aiPred && aiPred.cycle_id === activeCycle.id) {
           aiHtml = `
@@ -576,6 +584,10 @@ ${pastDataText}
                 <div class="bg-white/70 p-3 rounded-xl"><span class="text-[11px] text-slate-500 block mb-1">推測・排卵日</span><span class="font-bold text-teal-600 text-[15px]">${aiPred.ovulation_date ? Utils.formatMMDD(new Date(aiPred.ovulation_date)) : '-'}</span></div>
                 <div class="bg-white/70 p-3 rounded-xl"><span class="text-[11px] text-slate-500 block mb-1">予測・次生理日</span><span class="font-bold text-rose-500 text-[15px]">${aiPred.next_period_date ? Utils.formatMMDD(new Date(aiPred.next_period_date)) : '-'}</span></div>
               </div>
+              <div class="mb-4">
+                <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
+                <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="localStorage.setItem('iui_ai_memo_${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
+              </div>
               <div class="text-[12px] text-slate-700 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-blue-100/50">
                 <span class="font-bold mb-1 block text-slate-800">💡 AIからのコメント</span>
                 ${aiPred.reason}
@@ -584,9 +596,13 @@ ${pastDataText}
           `;
         } else if (cycleDailyForAI.length >= 5) {
           aiHtml = `
-            <div class="bg-gradient-to-br from-slate-100 to-blue-50 rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-blue-100 mb-6 text-center">
-              <div class="text-3xl mb-2">✨</div>
-              <p class="text-[13px] text-slate-800 font-bold mb-4">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
+            <div class="bg-gradient-to-br from-slate-100 to-blue-50 rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-blue-100 mb-6">
+              <div class="text-3xl mb-2 text-center">✨</div>
+              <p class="text-[13px] text-slate-800 font-bold mb-4 text-center">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
+              <div class="mb-4">
+                <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
+                <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="localStorage.setItem('iui_ai_memo_${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
+              </div>
               <button onclick="API.analyzeWithAI()" class="bg-blue-500 text-white w-full py-3.5 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-transform">AIで予測する</button>
             </div>
           `;
@@ -780,9 +796,8 @@ ${pastDataText}
           <div class="bg-card rounded-[16px] p-4 mb-3 shadow-sm border border-border/20 flex justify-between items-center active:bg-slate-50 transition-colors cursor-pointer"
                onclick="App.openModal('${r.type}', '${r.id}')">
             <div>
-              <div class="font-bold text-[15px] mb-1 text-main flex items-center gap-1">
+              <div class="font-bold text-[15px] mb-1 text-main">
                 ${Utils.toLocalYYYYMMDD(r.date)}
-                ${r.memo ? '<span class="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded ml-1 font-bold">メモあり</span>' : ''}
               </div>
               <div class="text-[13px] text-sub">${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}</div>
             </div>
@@ -905,7 +920,7 @@ ${pastDataText}
             </div>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo & 🐈 Hotate, Uni</p><p class="mt-1">v5.0 Full Restoration</p></div>
+          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.1 Smart Analytics</p></div>
         `;
       }
     };
@@ -919,13 +934,9 @@ ${pastDataText}
             <label class="block text-[13px] font-bold mb-1 text-main">日付</label>
             <input type="date" id="form-date" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" onchange="App.checkExistingDaily(this.value)">
           </div>
-          <div class="mb-4">
+          <div class="mb-6">
             <label class="block text-[13px] font-bold mb-1 text-main">基礎体温 (°C)</label>
             <input type="number" id="form-temp" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
-          </div>
-          <div class="mb-6">
-            <label class="block text-[13px] font-bold mb-1 text-main">AI分析用メモ (体調やおりもの等)</label>
-            <textarea id="form-memo" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[14px] outline-none" rows="2" placeholder="例: のびるおりものあり、下腹部痛など">${r.memo || ''}</textarea>
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('daily')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
@@ -1103,20 +1114,19 @@ ${pastDataText}
           })
           .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        if (cycleDaily.length === 0) {
-          if (this.chartInstance) { this.chartInstance.destroy(); this.chartInstance = null; }
-          const emptyEl = document.getElementById('tempChart-empty');
-          if (emptyEl) emptyEl.classList.remove('hidden');
-          return;
-        }
-
         const emptyEl = document.getElementById('tempChart-empty');
-        if (emptyEl) emptyEl.classList.add('hidden');
+        if (cycleDaily.length === 0) {
+          if (emptyEl) emptyEl.classList.remove('hidden');
+        } else {
+          if (emptyEl) emptyEl.classList.add('hidden');
+        }
         
         let actualEndDateStr = endDateStr;
-        const lastDataDateStr = Utils.toLocalYYYYMMDD(cycleDaily[cycleDaily.length - 1].date);
-        if (actualEndDateStr <= lastDataDateStr) {
-            actualEndDateStr = Utils.toLocalYYYYMMDD(Utils.addDays(lastDataDateStr, 1));
+        if (cycleDaily.length > 0) {
+            const lastDataDateStr = Utils.toLocalYYYYMMDD(cycleDaily[cycleDaily.length - 1].date);
+            if (actualEndDateStr <= lastDataDateStr) {
+                actualEndDateStr = Utils.toLocalYYYYMMDD(Utils.addDays(lastDataDateStr, 1));
+            }
         }
 
         const cycleIuiDates = iui
@@ -1244,8 +1254,6 @@ ${pastDataText}
         const r = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === dateStr);
         document.getElementById('form-id').value = r ? r.id : '';
         document.getElementById('form-temp').value = r ? (r.temperature || '') : '';
-        const memoEl = document.getElementById('form-memo');
-        if (memoEl) memoEl.value = r ? (r.memo || '') : '';
       },
 
       submitForm(table) {
@@ -1255,7 +1263,6 @@ ${pastDataText}
         if (table === 'daily') {
           payload.date = document.getElementById('form-date').value;
           payload.temperature = document.getElementById('form-temp').value;
-          payload.memo = document.getElementById('form-memo').value;
         } else if (table === 'clinic') {
           payload.visit_date = document.getElementById('form-date').value;
           payload.next_visit_date = document.getElementById('form-next').value;
@@ -1518,9 +1525,6 @@ ${pastDataText}
         if(eventContent) content += `<div class="mb-3 pb-2 border-b border-border/50">${eventContent}</div>`;
         if(dRec) {
           content += `<div class="mb-1 text-[14px] text-main">🌡 体温: <span class="font-bold">${dRec.temperature || '-'}</span> °C</div>`;
-          if (dRec.memo) {
-             content += `<div class="mb-2 text-[12px] text-sub flex items-start gap-1"><span class="mt-0.5 leading-none">📝</span><span class="leading-relaxed">${dRec.memo.replace(/\n/g, '<br>')}</span></div>`;
-          }
         }
         if(cRec) content += `<div class="text-[14px] mb-1 text-main">🏥 受診記録あり</div>`;
         if(iRec && iRec.actual_date) content += `<div class="text-[14px] text-blue-600">📌 IUI実施済み</div>`;
