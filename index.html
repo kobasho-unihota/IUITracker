@@ -514,6 +514,7 @@ ${pastDataText}
         const diffDays = Math.floor((new Date(today) - new Date(startD)) / 86400000) + 1;
         
         const preds = App.getPredictions();
+        const isRestCycle = activeCycle.type === 'お休み周期';
         
         const tabCurrentClass = dashTab === 'current' ? 'text-primary border-primary' : 'text-sub border-transparent';
         const tabNextClass = dashTab === 'next' ? 'text-primary border-primary' : 'text-sub border-transparent';
@@ -533,6 +534,13 @@ ${pastDataText}
               <div class="grid grid-cols-2 gap-y-5 gap-x-6">
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI実施日(済)</span><span class="text-lg font-bold text-blue-600">${preds.iui ? Utils.formatMMDD(new Date(preds.iui)) : '-'}</span></div>
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">IUI後経過</span><span class="text-lg font-bold text-main">${passedDays}<span class="text-[12px] font-normal text-sub ml-1">日目</span></span></div>
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${preds.isAIPeriod ? '次回生理予定(AI)' : '次回生理予定'}</span><span class="text-lg font-bold text-rose-500">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
+              </div>
+            `;
+          } else if (isRestCycle) {
+            dashGridHtml = `
+              <div class="grid grid-cols-2 gap-y-5 gap-x-6">
+                <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">今周期のIUI</span><span class="text-lg font-bold text-slate-400">お休み</span></div>
                 <div class="flex flex-col"><span class="text-[11px] text-sub mb-1">${preds.isAIPeriod ? '次回生理予定(AI)' : '次回生理予定'}</span><span class="text-lg font-bold text-rose-500">${preds.period ? Utils.formatMMDD(new Date(preds.period)) : '-'}</span><span class="text-[10px] text-sub mt-0.5">±3日</span></div>
               </div>
             `;
@@ -619,7 +627,7 @@ ${pastDataText}
           tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50" onclick="App.openModal('daily')"><div class="w-2 h-2 rounded-full bg-primary mr-3"></div><span class="font-medium text-main">基礎体温を記録しましょう <span class="text-gray-300 ml-1">›</span></span></div>`);
         }
 
-        if (preds.iui && !preds.isIUIDone && !preds.isPredictedIUI) {
+        if (preds.iui && !preds.isIUIDone && !preds.isPredictedIUI && !isRestCycle) {
           if (today === preds.iui) {
             tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50 border-t border-border/50" onclick="App.openModal('iui')"><div class="w-2 h-2 rounded-full bg-blue-500 mr-3"></div><span class="font-medium text-blue-600">本日IUI予定日です。結果を記録 <span class="text-gray-300 ml-1">›</span></span></div>`);
           } else if (today < preds.iui && preds.abstain && today >= preds.abstain) {
@@ -628,10 +636,10 @@ ${pastDataText}
         }
 
         return headerHtml + `
-          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6">
+          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6 cursor-pointer active:bg-slate-50 transition-colors" onclick="App.openModal('new-cycle', '${activeCycle.id}')">
             <div class="flex justify-between items-center mb-3">
-              <span class="px-3 py-1 bg-primary-light text-primary text-xs font-bold rounded-lg">${activeCycle.status}</span>
-              <span class="text-sm text-sub font-medium">周期 ${diffDays}日目</span>
+              <span class="px-3 py-1 bg-primary-light text-primary text-xs font-bold rounded-lg flex items-center gap-1">${activeCycle.status} <span class="text-[10px] bg-white px-1 py-0.5 rounded opacity-70">${activeCycle.type||'未設定'}</span></span>
+              <span class="text-sm text-sub font-medium">周期 ${diffDays}日目 <span class="text-slate-300 ml-1">›</span></span>
             </div>
             ${tabsHtml}
             ${dashGridHtml}
@@ -922,7 +930,7 @@ ${pastDataText}
             </div>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.3 Delete Records feature</p></div>
+          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.4 Rest Cycle Mode</p></div>
         `;
       }
     };
@@ -1026,6 +1034,7 @@ ${pastDataText}
               <option value="人工授精周期" ${r.type==='人工授精周期'?'selected':''}>人工授精周期</option>
               <option value="排卵誘発周期" ${r.type==='排卵誘発周期'?'selected':''}>排卵誘発周期</option>
               <option value="自然周期" ${r.type==='自然周期'?'selected':''}>自然周期</option>
+              <option value="お休み周期" ${r.type==='お休み周期'?'selected':''}>お休み周期 (IUIなし)</option>
             </select>
           </div>
           <div class="mb-6">
@@ -1361,6 +1370,8 @@ ${pastDataText}
           futureCycles: [] 
         };
         if (!activeCycle) return preds;
+        
+        const isRestCycle = activeCycle.type === 'お休み周期';
 
         let totalIuiPhase = 0;
         let countIuiPhase = 0;
@@ -1412,11 +1423,18 @@ ${pastDataText}
           const baseIuiDate = preds.actual || preds.iui;
           preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(baseIuiDate, avgLutealPhase));
         } else {
-          const estIui = Utils.addDays(startD, avgIuiPhase);
-          preds.iui = Utils.toLocalYYYYMMDD(estIui);
-          preds.abstain = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, -settings.abstainDays));
-          preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, avgLutealPhase));
-          preds.isPredictedIUI = true;
+          if (isRestCycle) {
+             preds.iui = null;
+             preds.abstain = null;
+             preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(startD, settings.cycleLen));
+             preds.isPredictedIUI = false;
+          } else {
+             const estIui = Utils.addDays(startD, avgIuiPhase);
+             preds.iui = Utils.toLocalYYYYMMDD(estIui);
+             preds.abstain = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, -settings.abstainDays));
+             preds.period = Utils.toLocalYYYYMMDD(Utils.addDays(estIui, avgLutealPhase));
+             preds.isPredictedIUI = true;
+          }
         }
 
         if (aiPrediction && aiPrediction.cycle_id === activeCycle.id && aiPrediction.ovulation_date && aiPrediction.next_period_date) {
