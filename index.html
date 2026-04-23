@@ -159,6 +159,7 @@
         daily: [],
         clinic: [],
         iui: [],
+        aiPredictions: JSON.parse(localStorage.getItem('iui_data_ai_predictions')) || [],
         aiPrediction: JSON.parse(localStorage.getItem('iui_ai_prediction')) || null,
         apiKey: localStorage.getItem('iui_gemini_api_key') || '',
         activeCycle: null,
@@ -180,10 +181,15 @@
           const daily = JSON.parse(localStorage.getItem('iui_data_daily')) || [];
           const clinic = JSON.parse(localStorage.getItem('iui_data_clinic')) || [];
           const iui = JSON.parse(localStorage.getItem('iui_data_iui')) || [];
+          const aiPredictions = JSON.parse(localStorage.getItem('iui_data_ai_predictions')) || [];
           
           if (cycles.length > 0) {
             const activeCycle = cycles[cycles.length - 1];
-            Store.set({ cycles, daily, clinic, iui, activeCycle });
+            Store.set({ cycles, daily, clinic, iui, aiPredictions, activeCycle });
+            
+            const currentAi = aiPredictions.filter(p => p.cycle_id === activeCycle.id).pop();
+            if (currentAi) Store.set({ aiPrediction: currentAi });
+            
             return true;
           }
         } catch(e) {
@@ -195,19 +201,28 @@
       async fetchAll() {
         try {
           const fetchTable = async (t) => (await fetch(`${API_URL}?table=${t}`)).json();
-          const [cycles, daily, clinic, iui] = await Promise.all([
-            fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events')
+          const [cycles, daily, clinic, iui, aiPredictions] = await Promise.all([
+            fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events'), fetchTable('ai_predictions')
           ]);
           
           cycles.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
           const activeCycle = cycles.length > 0 ? cycles[cycles.length - 1] : null;
           
-          Store.set({ cycles, daily, clinic, iui, activeCycle });
+          Store.set({ cycles, daily, clinic, iui, aiPredictions, activeCycle });
 
           localStorage.setItem('iui_data_cycles', JSON.stringify(cycles));
           localStorage.setItem('iui_data_daily', JSON.stringify(daily));
           localStorage.setItem('iui_data_clinic', JSON.stringify(clinic));
           localStorage.setItem('iui_data_iui', JSON.stringify(iui));
+          localStorage.setItem('iui_data_ai_predictions', JSON.stringify(aiPredictions));
+          
+          if (activeCycle) {
+            const currentAi = aiPredictions.filter(p => p.cycle_id === activeCycle.id).pop();
+            if (currentAi) {
+               Store.set({ aiPrediction: currentAi });
+               localStorage.setItem('iui_ai_prediction', JSON.stringify(currentAi));
+            }
+          }
 
           if (!localStorage.getItem('iui_settings')) {
             const stats = App.getCycleStats();
@@ -235,10 +250,16 @@
           const targetDate = payloadData.date || payloadData.visit_date || payloadData.planned_date || Utils.getTodayStr();
           const targetCycle = App.getCycleForDate(targetDate);
           if (!targetCycle) {
-            Utils.showToast('対象日付以前の周期がありません。先に周期を追加してください。', true);
-            return false;
+            if (table !== 'ai_predictions') {
+               Utils.showToast('対象日付以前の周期がありません。先に周期を追加してください。', true);
+               return false;
+            }
+          } else {
+             cycleId = targetCycle.id;
           }
-          cycleId = targetCycle.id;
+          if (table === 'ai_predictions' && payloadData.cycle_id) {
+             cycleId = payloadData.cycle_id;
+          }
         }
 
         const payload = { 
@@ -253,7 +274,7 @@
         if(table === 'daily_records' && !localData.lh_result) localData.lh_result = '';
         
         const s = Store.get();
-        let targetArrayKey = table === 'daily_records' ? 'daily' : table === 'clinic_visits' ? 'clinic' : table === 'iui_events' ? 'iui' : 'cycles';
+        let targetArrayKey = table === 'daily_records' ? 'daily' : table === 'clinic_visits' ? 'clinic' : table === 'iui_events' ? 'iui' : table === 'ai_predictions' ? 'aiPredictions' : 'cycles';
         let newArray = [...s[targetArrayKey]];
         
         if (isUpdate) {
@@ -273,13 +294,17 @@
         localStorage.setItem(`iui_data_${targetArrayKey}`, JSON.stringify(newArray));
         
         App.closeModal();
-        Utils.showToast('保存しました');
+        if (table !== 'ai_predictions') {
+           Utils.showToast('保存しました');
+        }
 
         try {
           fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
             .then(res => res.json())
             .then(res => { if(res.status !== 'success') throw new Error(); })
-            .catch(() => Utils.showToast('クラウド保存に遅延が発生しています', true));
+            .catch(() => {
+                if (table !== 'ai_predictions') Utils.showToast('クラウド保存に遅延が発生しています', true);
+            });
         } catch(e) {}
         
         return true;
@@ -472,6 +497,18 @@ ${pastDataText}
           const cleanText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
           const aiPred = JSON.parse(cleanText);
           aiPred.cycle_id = activeCycle.id;
+          
+          // AI予測結果をクラウド(スプレッドシート)にも保存して他端末と同期する
+          const existingPred = Store.get().aiPredictions.find(p => p.cycle_id === activeCycle.id);
+          const savePayload = {
+              id: existingPred ? existingPred.id : Utils.generateId(),
+              cycle_id: activeCycle.id,
+              ovulation_date: aiPred.ovulation_date || '',
+              next_period_date: aiPred.next_period_date || '',
+              reason: aiPred.reason || ''
+          };
+          API.save('ai_predictions', savePayload);
+          
           Store.set({ aiPrediction: aiPred });
           localStorage.setItem('iui_ai_prediction', JSON.stringify(aiPred));
           Utils.showToast('AIの分析が完了しました✨');
@@ -636,8 +673,8 @@ ${pastDataText}
         }
 
         return headerHtml + `
-          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6">
-            <div class="flex justify-between items-center mb-3 cursor-pointer active:opacity-50 transition-opacity" onclick="App.openModal('new-cycle', '${activeCycle.id}')">
+          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6 cursor-pointer active:bg-slate-50 transition-colors" onclick="App.openModal('new-cycle', '${activeCycle.id}')">
+            <div class="flex justify-between items-center mb-3">
               <span class="px-3 py-1 bg-primary-light text-primary text-xs font-bold rounded-lg flex items-center gap-1">${activeCycle.status} <span class="text-[10px] bg-white px-1 py-0.5 rounded opacity-70">${activeCycle.type||'未設定'}</span></span>
               <span class="text-sm text-sub font-medium">周期 ${diffDays}日目 <span class="text-slate-300 ml-1">›</span></span>
             </div>
@@ -805,9 +842,8 @@ ${pastDataText}
           <div class="bg-card rounded-[16px] p-4 mb-3 shadow-sm border border-border/20 flex justify-between items-center active:bg-slate-50 transition-colors cursor-pointer"
                onclick="App.openModal('${r.type}', '${r.id}')">
             <div>
-              <div class="font-bold text-[15px] mb-1 text-main flex items-center gap-1">
+              <div class="font-bold text-[15px] mb-1 text-main">
                 ${Utils.toLocalYYYYMMDD(r.date)}
-                ${r.memo ? '<span class="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded ml-1 font-bold">メモあり</span>' : ''}
               </div>
               <div class="text-[13px] text-sub">${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}</div>
             </div>
@@ -930,7 +966,7 @@ ${pastDataText}
             </div>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.4 Rest Cycle Mode</p></div>
+          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v6.0 Rhythm Full Edition</p></div>
         `;
       }
     };
@@ -947,10 +983,6 @@ ${pastDataText}
           <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1 text-main">基礎体温 (°C)</label>
             <input type="number" id="form-temp" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
-          </div>
-          <div class="mb-6">
-            <label class="block text-[13px] font-bold mb-1 text-main">AI分析用メモ (体調やおりもの等)</label>
-            <textarea id="form-memo" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[14px] outline-none" rows="2" placeholder="例: のびるおりものあり、下腹部痛など">${r.memo || ''}</textarea>
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('daily')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
@@ -1277,8 +1309,6 @@ ${pastDataText}
         const r = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === dateStr);
         document.getElementById('form-id').value = r ? r.id : '';
         document.getElementById('form-temp').value = r ? (r.temperature || '') : '';
-        const memoEl = document.getElementById('form-memo');
-        if (memoEl) memoEl.value = r ? (r.memo || '') : '';
       },
 
       submitForm(table) {
@@ -1288,7 +1318,6 @@ ${pastDataText}
         if (table === 'daily') {
           payload.date = document.getElementById('form-date').value;
           payload.temperature = document.getElementById('form-temp').value;
-          payload.memo = document.getElementById('form-memo').value;
         } else if (table === 'clinic') {
           payload.visit_date = document.getElementById('form-date').value;
           payload.next_visit_date = document.getElementById('form-next').value;
