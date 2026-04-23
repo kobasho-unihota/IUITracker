@@ -188,7 +188,11 @@
             Store.set({ cycles, daily, clinic, iui, aiPredictions, activeCycle });
             
             const currentAi = aiPredictions.filter(p => p.cycle_id === activeCycle.id).pop();
-            if (currentAi) Store.set({ aiPrediction: currentAi });
+            if (currentAi) {
+               Store.set({ aiPrediction: currentAi });
+            } else {
+               Store.set({ aiPrediction: null });
+            }
             
             return true;
           }
@@ -221,7 +225,12 @@
             if (currentAi) {
                Store.set({ aiPrediction: currentAi });
                localStorage.setItem('iui_ai_prediction', JSON.stringify(currentAi));
+            } else {
+               Store.set({ aiPrediction: null });
+               localStorage.removeItem('iui_ai_prediction');
             }
+          } else {
+             Store.set({ aiPrediction: null });
           }
 
           if (!localStorage.getItem('iui_settings')) {
