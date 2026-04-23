@@ -797,8 +797,9 @@ ${pastDataText}
           <div class="bg-card rounded-[16px] p-4 mb-3 shadow-sm border border-border/20 flex justify-between items-center active:bg-slate-50 transition-colors cursor-pointer"
                onclick="App.openModal('${r.type}', '${r.id}')">
             <div>
-              <div class="font-bold text-[15px] mb-1 text-main">
+              <div class="font-bold text-[15px] mb-1 text-main flex items-center gap-1">
                 ${Utils.toLocalYYYYMMDD(r.date)}
+                ${r.memo ? '<span class="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded ml-1 font-bold">メモあり</span>' : ''}
               </div>
               <div class="text-[13px] text-sub">${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}</div>
             </div>
@@ -921,7 +922,7 @@ ${pastDataText}
             </div>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.2 Smart Analytics Integration</p></div>
+          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v5.3 Delete Records feature</p></div>
         `;
       }
     };
@@ -935,12 +936,17 @@ ${pastDataText}
             <label class="block text-[13px] font-bold mb-1 text-main">日付</label>
             <input type="date" id="form-date" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" onchange="App.checkExistingDaily(this.value)">
           </div>
-          <div class="mb-6">
+          <div class="mb-4">
             <label class="block text-[13px] font-bold mb-1 text-main">基礎体温 (°C)</label>
             <input type="number" id="form-temp" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
           </div>
+          <div class="mb-6">
+            <label class="block text-[13px] font-bold mb-1 text-main">AI分析用メモ (体調やおりもの等)</label>
+            <textarea id="form-memo" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[14px] outline-none" rows="2" placeholder="例: のびるおりものあり、下腹部痛など">${r.memo || ''}</textarea>
+          </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('daily')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          ${id ? `<button onclick="App.deleteRecord('daily', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この記録を削除</button>` : ''}
         `;
       },
       clinic: (id, defaultDate) => {
@@ -957,6 +963,7 @@ ${pastDataText}
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('clinic')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          ${id ? `<button onclick="App.deleteRecord('clinic', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この記録を削除</button>` : ''}
         `;
       },
       iui: (id, defaultDate) => {
@@ -1002,6 +1009,7 @@ ${pastDataText}
           
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('iui')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          ${id ? `<button onclick="App.deleteRecord('iui', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この予定を削除</button>` : ''}
         `;
       },
       'new-cycle': (id, defaultDate) => {
@@ -1029,6 +1037,7 @@ ${pastDataText}
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
           <button onclick="App.submitForm('cycles')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">周期を保存</button>
+          ${id ? `<button onclick="App.deleteRecord('cycles', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この周期を削除</button>` : ''}
         `;
       },
       meds: () => `<div class="text-center text-sub py-10 font-bold">機能準備中</div>`
@@ -1104,7 +1113,6 @@ ${pastDataText}
         if (targetIndex !== -1 && targetIndex < sortedCycles.length - 1) {
           endDateStr = Utils.toLocalYYYYMMDD(sortedCycles[targetIndex + 1].start_date);
         } else {
-          // ▼ グラフの終了日にもAIの予測日を反映する
           if (aiPrediction && aiPrediction.cycle_id === targetCycleId && aiPrediction.next_period_date) {
             endDateStr = Utils.toLocalYYYYMMDD(aiPrediction.next_period_date);
           } else {
@@ -1260,6 +1268,8 @@ ${pastDataText}
         const r = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === dateStr);
         document.getElementById('form-id').value = r ? r.id : '';
         document.getElementById('form-temp').value = r ? (r.temperature || '') : '';
+        const memoEl = document.getElementById('form-memo');
+        if (memoEl) memoEl.value = r ? (r.memo || '') : '';
       },
 
       submitForm(table) {
@@ -1269,6 +1279,7 @@ ${pastDataText}
         if (table === 'daily') {
           payload.date = document.getElementById('form-date').value;
           payload.temperature = document.getElementById('form-temp').value;
+          payload.memo = document.getElementById('form-memo').value;
         } else if (table === 'clinic') {
           payload.visit_date = document.getElementById('form-date').value;
           payload.next_visit_date = document.getElementById('form-next').value;
@@ -1282,6 +1293,42 @@ ${pastDataText}
         }
 
         API.save(table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles', payload);
+      },
+
+      deleteRecord(table, id, btnEl) {
+        if (!btnEl.dataset.confirm) {
+           btnEl.dataset.confirm = "true";
+           btnEl.classList.add('bg-rose-500', 'text-white');
+           btnEl.classList.remove('bg-rose-50', 'text-rose-500', 'border-rose-200');
+           btnEl.innerText = '本当に削除しますか？';
+           setTimeout(() => {
+              if (btnEl) {
+                 btnEl.dataset.confirm = "";
+                 btnEl.classList.remove('bg-rose-500', 'text-white');
+                 btnEl.classList.add('bg-rose-50', 'text-rose-500', 'border-rose-200');
+                 btnEl.innerText = 'この記録を削除';
+              }
+           }, 3000);
+           return;
+        }
+        
+        const targetArrayKey = table; 
+        let newArray = Store.get()[targetArrayKey].filter(item => item.id !== id);
+        
+        Store.set({ [targetArrayKey]: newArray });
+        if(table === 'cycles') {
+          Store.set({ activeCycle: newArray.length > 0 ? newArray[newArray.length - 1] : null });
+        }
+        localStorage.setItem(`iui_data_${targetArrayKey}`, JSON.stringify(newArray));
+        
+        App.closeModal();
+        Utils.showToast('削除しました');
+
+        const dbTable = table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles';
+
+        try {
+          fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', table: dbTable, id: id }) });
+        } catch(e) {}
       },
 
       getCycleStats() {
@@ -1372,7 +1419,6 @@ ${pastDataText}
           preds.isPredictedIUI = true;
         }
 
-        // ▼ AI予測が存在し、排卵日が推測されている場合は生理予定日を上書き
         if (aiPrediction && aiPrediction.cycle_id === activeCycle.id && aiPrediction.ovulation_date && aiPrediction.next_period_date) {
             preds.period = Utils.toLocalYYYYMMDD(aiPrediction.next_period_date);
             preds.isAIPeriod = true;
@@ -1498,7 +1544,6 @@ ${pastDataText}
         else if (dStr === preds.iui && preds.isPredictedIUI) eventContent += makeEventRow('📌 IUI目安 (予測)', 'text-blue-500/70', dStr);
         else if (futureIuis.includes(dStr)) eventContent += makeEventRow('📌 IUI目安 (予測)', 'text-blue-500/70', dStr);
         
-        // ▼ AI予測の場合は表示を切り替える
         if (cycleStarts.includes(dStr)) eventContent += makeEventRow('🩸 生理開始日', 'text-rose-500', dStr);
         else if (dStr === preds.period) eventContent += makeEventRow(preds.isAIPeriod ? '✨ 次回生理予定 (AI分析)' : '🩸 次回生理予定日', 'text-rose-500', dStr);
         else if (futurePeriods.includes(dStr)) eventContent += makeEventRow('🩸 生理予定日 (予測)', 'text-rose-500/70', dStr);
