@@ -712,8 +712,8 @@ ${pastDataText}
         }
 
         return headerHtml + `
-          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6 cursor-pointer active:bg-slate-50 transition-colors" onclick="App.openModal('new-cycle', '${activeCycle.id}')">
-            <div class="flex justify-between items-center mb-3">
+          <div class="bg-card rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border/20 mb-6">
+            <div class="flex justify-between items-center mb-3 cursor-pointer active:opacity-50 transition-opacity" onclick="App.openModal('new-cycle', '${activeCycle.id}')">
               <span class="px-3 py-1 bg-primary-light text-primary text-xs font-bold rounded-lg flex items-center gap-1">${activeCycle.status} <span class="text-[10px] bg-white px-1 py-0.5 rounded opacity-70">${activeCycle.type||'未設定'}</span></span>
               <span class="text-sm text-sub font-medium">周期 ${diffDays}日目 <span class="text-slate-300 ml-1">›</span></span>
             </div>
