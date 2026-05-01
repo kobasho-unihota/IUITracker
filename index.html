@@ -657,6 +657,7 @@ ${pastDataText}
 
         let aiHtml = '';
         const aiPred = aiPredictions.find(p => p.cycle_id === activeCycle.id);
+        const cycleDailyForAI = daily.filter(d => d.cycle_id === activeCycle.id && d.temperature);
         const savedAiMemo = localStorage.getItem(`iui_ai_memo_${activeCycle.id}`) || '';
         
         if (aiPred) {
