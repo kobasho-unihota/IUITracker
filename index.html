@@ -21,6 +21,216 @@
   <!-- Chart.js for Graph -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import {
+      GoogleAuthProvider,
+      getAuth,
+      onAuthStateChanged,
+      signInWithPopup,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import {
+      collection,
+      deleteDoc,
+      doc,
+      getDocs,
+      getFirestore,
+      onSnapshot,
+      setDoc,
+    } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDdRlINBq1fdFbfKKkl5dQQM6rlWAKM9vo",
+      authDomain: "seed-note-kobasho.firebaseapp.com",
+      projectId: "seed-note-kobasho",
+      storageBucket: "seed-note-kobasho.firebasestorage.app",
+      messagingSenderId: "1042714808944",
+      appId: "1:1042714808944:web:f5253c9b257bdac09a1ab5",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    const tableKeys = {
+      cycles: "cycles",
+      daily_records: "daily",
+      clinic_visits: "clinic",
+      iui_events: "iui",
+      ai_predictions: "aiPredictions",
+    };
+    const localStorageKeys = {
+      cycles: "iui_data_cycles",
+      daily: "iui_data_daily",
+      clinic: "iui_data_clinic",
+      iui: "iui_data_iui",
+      aiPredictions: "iui_data_ai_predictions",
+    };
+
+    const readLocalArray = (key) => {
+      try {
+        return JSON.parse(localStorage.getItem(localStorageKeys[key])) || [];
+      } catch {
+        return [];
+      }
+    };
+
+    const writeLocalArray = (key, rows) => {
+      localStorage.setItem(localStorageKeys[key], JSON.stringify(rows));
+    };
+
+    const getActiveCycle = (cycles) => {
+      const sorted = [...cycles].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+      return sorted[sorted.length - 1] || null;
+    };
+
+    const syncState = {
+      user: null,
+      status: "signed-out",
+      unsubscribers: [],
+      snapshots: {},
+      initialized: false,
+    };
+
+    const notify = () => {
+      window.dispatchEvent(new CustomEvent("firebase-sync-change", {
+        detail: {
+          user: syncState.user,
+          status: syncState.status,
+        },
+      }));
+    };
+
+    const tableRef = (uid, table) => collection(db, "users", uid, "iuiTracker", table, "records");
+
+    const upsertLocalRows = (key, rows) => {
+      const store = window.Store;
+      if (!store) return;
+      const sortedRows = key === "cycles"
+        ? [...rows].sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+        : rows;
+
+      const updates = { [key]: sortedRows };
+      if (key === "cycles") {
+        updates.activeCycle = getActiveCycle(sortedRows);
+      }
+
+      store.set(updates);
+      writeLocalArray(key, sortedRows);
+
+      if (key === "aiPredictions") {
+        const activeCycle = store.get().activeCycle;
+        const currentAi = activeCycle
+          ? sortedRows.filter((item) => item.cycle_id === activeCycle.id).pop()
+          : null;
+        store.set({ aiPrediction: currentAi || null });
+        if (currentAi) {
+          localStorage.setItem("iui_ai_prediction", JSON.stringify(currentAi));
+        } else {
+          localStorage.removeItem("iui_ai_prediction");
+        }
+      }
+    };
+
+    const uploadLocalIfEmpty = async (uid, table, key) => {
+      const ref = tableRef(uid, table);
+      const remote = await getDocs(ref);
+      if (!remote.empty) return;
+
+      const localRows = readLocalArray(key);
+      if (!localRows.length) return;
+
+      await Promise.all(
+        localRows
+          .filter((row) => row && row.id)
+          .map((row) => setDoc(doc(ref, row.id), row)),
+      );
+    };
+
+    const startSync = async (user) => {
+      syncState.status = "syncing";
+      notify();
+
+      syncState.unsubscribers.forEach((unsubscribe) => unsubscribe());
+      syncState.unsubscribers = [];
+      syncState.snapshots = {};
+
+      await Promise.all(
+        Object.entries(tableKeys).map(([table, key]) => uploadLocalIfEmpty(user.uid, table, key)),
+      );
+
+      Object.entries(tableKeys).forEach(([table, key]) => {
+        const unsubscribe = onSnapshot(
+          tableRef(user.uid, table),
+          (snapshot) => {
+            syncState.snapshots[key] = snapshot.docs.map((item) => item.data());
+            upsertLocalRows(key, syncState.snapshots[key]);
+            syncState.status = "synced";
+            notify();
+          },
+          (error) => {
+            console.error("Firestore sync error:", error);
+            syncState.status = "error";
+            notify();
+          },
+        );
+        syncState.unsubscribers.push(unsubscribe);
+      });
+    };
+
+    window.FirebaseSync = {
+      get user() {
+        return syncState.user;
+      },
+      get status() {
+        return syncState.status;
+      },
+      async signIn() {
+        syncState.status = "syncing";
+        notify();
+        await signInWithPopup(auth, provider);
+      },
+      async signOut() {
+        await signOut(auth);
+      },
+      async save(table, record) {
+        if (!syncState.user || !record?.id) return;
+        await setDoc(doc(tableRef(syncState.user.uid, table), record.id), record);
+      },
+      async delete(table, id) {
+        if (!syncState.user || !id) return;
+        await deleteDoc(doc(tableRef(syncState.user.uid, table), id));
+      },
+      async importLocalIfEmpty() {
+        if (!syncState.user) return;
+        await Promise.all(
+          Object.entries(tableKeys).map(([table, key]) => uploadLocalIfEmpty(syncState.user.uid, table, key)),
+        );
+      },
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      syncState.user = user;
+
+      if (!user) {
+        syncState.unsubscribers.forEach((unsubscribe) => unsubscribe());
+        syncState.unsubscribers = [];
+        syncState.status = "signed-out";
+        notify();
+        return;
+      }
+
+      try {
+        await startSync(user);
+      } catch (error) {
+        console.error("Firebase initialization error:", error);
+        syncState.status = "error";
+        notify();
+      }
+    });
+  </script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -162,6 +372,8 @@
         aiPredictions: JSON.parse(localStorage.getItem('iui_data_ai_predictions')) || [],
         aiPrediction: JSON.parse(localStorage.getItem('iui_ai_prediction')) || null,
         apiKey: localStorage.getItem('iui_gemini_api_key') || '',
+        syncStatus: 'signed-out',
+        syncUserEmail: '',
         activeCycle: null,
         selectedCycleId: null,
         calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -173,6 +385,15 @@
       },
       get() { return this.state; }
     };
+    window.Store = Store;
+
+    window.addEventListener('firebase-sync-change', (event) => {
+      const detail = event.detail || {};
+      Store.set({
+        syncStatus: detail.status || 'signed-out',
+        syncUserEmail: detail.user?.email || '',
+      });
+    });
 
     const getFormTitle = (type) => {
       if (type === 'iui') {
@@ -249,6 +470,8 @@
               App.updateSettings('cycleLen', stats.avg);
             }
           }
+
+          await window.FirebaseSync?.importLocalIfEmpty();
         } catch (e) {
           console.warn('Fetch error:', e);
         }
@@ -318,13 +541,11 @@
         }
 
         try {
-          fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
-            .then(res => res.json())
-            .then(res => { if(res.status !== 'success') throw new Error(); })
-            .catch(() => {
-                if (table !== 'ai_predictions') Utils.showToast('クラウド保存に遅延が発生しています', true);
-            });
-        } catch(e) {}
+          await window.FirebaseSync?.save(table, localData);
+        } catch(e) {
+          console.warn('Firestore save error:', e);
+          if (table !== 'ai_predictions') Utils.showToast('クラウド保存に遅延が発生しています', true);
+        }
         
         return true;
       },
@@ -1054,8 +1275,13 @@ ${pastDataText}
       },
 
       settings: () => {
-        const { settings, apiKey } = Store.get();
+        const { settings, apiKey, syncStatus, syncUserEmail } = Store.get();
         const stats = App.getCycleStats();
+        const syncLabel = syncStatus === 'synced' ? '同期中' : syncStatus === 'syncing' ? '同期準備中' : syncStatus === 'error' ? '同期エラー' : '未同期';
+        const syncDotClass = syncStatus === 'synced' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-amber-400' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-slate-300';
+        const syncButtonHtml = syncStatus === 'signed-out' || syncStatus === 'error'
+          ? `<button onclick="App.signInToSync()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-sm active:scale-[0.98] transition-transform">Googleで同期を始める</button>`
+          : `<button onclick="App.signOutFromSync()" class="w-full bg-white border border-border text-main font-bold py-3.5 rounded-xl active:bg-slate-50 transition-colors">同期を解除</button>`;
         
         const statHtml = stats.count > 0 
           ? `<div class="flex gap-2 mt-3">
@@ -1113,6 +1339,21 @@ ${pastDataText}
               <input type="password" id="set-api-key" class="form-control w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-[15px] outline-none" value="${apiKey}" placeholder="AIzaSy..." onchange="App.updateApiKey(this.value)">
               <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">※キーは端末内(ブラウザ)にのみ安全に保存されます。<br>※基礎体温と過去の実績データから分析を行います。</p>
             </div>
+          </div>
+
+          <h2 class="text-sm font-bold text-main mb-3 ml-1 mt-8">Firebase同期</h2>
+          <div class="bg-card rounded-[20px] p-5 shadow-sm border border-border/20 mb-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <div class="text-[13px] font-bold text-main">クラウド同期</div>
+                <div class="text-[11px] text-sub mt-1">${syncUserEmail || 'Googleログインで複数端末から同じデータを使えます'}</div>
+              </div>
+              <div class="flex items-center gap-2 text-[12px] font-bold text-main">
+                <span class="w-2.5 h-2.5 rounded-full ${syncDotClass}"></span>${syncLabel}
+              </div>
+            </div>
+            ${syncButtonHtml}
+            <p class="text-[10px] text-sub mt-3 leading-relaxed">初回ログイン時、端末内の周期・日次・通院・IUI・AI分析データをFirestoreへアップロードします。以後は保存・削除が自動同期されます。</p>
           </div>
 
           <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v9.0 Dynamic Mode Switching</p></div>
@@ -1583,8 +1824,10 @@ ${pastDataText}
         const dbTable = table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles';
 
         try {
-          fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', table: dbTable, id: id }) });
-        } catch(e) {}
+          window.FirebaseSync?.delete(dbTable, id);
+        } catch(e) {
+          console.warn('Firestore delete error:', e);
+        }
       },
 
       getCycleStats() {
@@ -1904,6 +2147,26 @@ ${pastDataText}
         Store.set({ apiKey: key });
         localStorage.setItem('iui_gemini_api_key', key);
         Utils.showToast('APIキーを保存しました');
+      },
+
+      async signInToSync() {
+        try {
+          await window.FirebaseSync?.signIn();
+          Utils.showToast('Firebase同期を開始しました');
+        } catch (e) {
+          console.warn('Firebase sign in error:', e);
+          Utils.showToast('ログインが完了できませんでした', true);
+        }
+      },
+
+      async signOutFromSync() {
+        try {
+          await window.FirebaseSync?.signOut();
+          Utils.showToast('同期を解除しました');
+        } catch (e) {
+          console.warn('Firebase sign out error:', e);
+          Utils.showToast('同期解除に失敗しました', true);
+        }
       },
       
       openCalendarLink(title, dateStr) {
