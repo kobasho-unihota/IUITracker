@@ -34,7 +34,7 @@
       collection,
       deleteDoc,
       doc,
-      getDocs,
+      getDoc,
       getFirestore,
       onSnapshot,
       setDoc,
@@ -60,25 +60,7 @@
       iui_events: "iui",
       ai_predictions: "aiPredictions",
     };
-    const localStorageKeys = {
-      cycles: "iui_data_cycles",
-      daily: "iui_data_daily",
-      clinic: "iui_data_clinic",
-      iui: "iui_data_iui",
-      aiPredictions: "iui_data_ai_predictions",
-    };
-
-    const readLocalArray = (key) => {
-      try {
-        return JSON.parse(localStorage.getItem(localStorageKeys[key])) || [];
-      } catch {
-        return [];
-      }
-    };
-
-    const writeLocalArray = (key, rows) => {
-      localStorage.setItem(localStorageKeys[key], JSON.stringify(rows));
-    };
+    const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70 };
 
     const getActiveCycle = (cycles) => {
       const sorted = [...cycles].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
@@ -90,7 +72,6 @@
       status: "signed-out",
       unsubscribers: [],
       snapshots: {},
-      initialized: false,
     };
 
     const notify = () => {
@@ -103,6 +84,7 @@
     };
 
     const tableRef = (uid, table) => collection(db, "users", uid, "iuiTracker", table, "records");
+    const settingsRef = (uid) => doc(db, "users", uid, "iuiTrackerMeta", "settings");
 
     const upsertLocalRows = (key, rows) => {
       const store = window.Store;
@@ -117,7 +99,6 @@
       }
 
       store.set(updates);
-      writeLocalArray(key, sortedRows);
 
       if (key === "aiPredictions") {
         const activeCycle = store.get().activeCycle;
@@ -125,27 +106,7 @@
           ? sortedRows.filter((item) => item.cycle_id === activeCycle.id).pop()
           : null;
         store.set({ aiPrediction: currentAi || null });
-        if (currentAi) {
-          localStorage.setItem("iui_ai_prediction", JSON.stringify(currentAi));
-        } else {
-          localStorage.removeItem("iui_ai_prediction");
-        }
       }
-    };
-
-    const uploadLocalIfEmpty = async (uid, table, key) => {
-      const ref = tableRef(uid, table);
-      const remote = await getDocs(ref);
-      if (!remote.empty) return;
-
-      const localRows = readLocalArray(key);
-      if (!localRows.length) return;
-
-      await Promise.all(
-        localRows
-          .filter((row) => row && row.id)
-          .map((row) => setDoc(doc(ref, row.id), row)),
-      );
     };
 
     const startSync = async (user) => {
@@ -156,9 +117,34 @@
       syncState.unsubscribers = [];
       syncState.snapshots = {};
 
-      await Promise.all(
-        Object.entries(tableKeys).map(([table, key]) => uploadLocalIfEmpty(user.uid, table, key)),
+      const existingSettings = await getDoc(settingsRef(user.uid));
+      if (!existingSettings.exists()) {
+        await setDoc(settingsRef(user.uid), {
+          appSettings: defaultSettings,
+          apiKey: "",
+          aiMemos: {},
+        });
+      }
+
+      const unsubscribeSettings = onSnapshot(
+        settingsRef(user.uid),
+        (snapshot) => {
+          const data = snapshot.data() || {};
+          const store = window.Store;
+          if (!store) return;
+          store.set({
+            settings: { ...defaultSettings, ...(data.appSettings || {}) },
+            apiKey: data.apiKey || "",
+            aiMemos: data.aiMemos || {},
+          });
+        },
+        (error) => {
+          console.error("Firestore settings sync error:", error);
+          syncState.status = "error";
+          notify();
+        },
       );
+      syncState.unsubscribers.push(unsubscribeSettings);
 
       Object.entries(tableKeys).forEach(([table, key]) => {
         const unsubscribe = onSnapshot(
@@ -202,11 +188,9 @@
         if (!syncState.user || !id) return;
         await deleteDoc(doc(tableRef(syncState.user.uid, table), id));
       },
-      async importLocalIfEmpty() {
-        if (!syncState.user) return;
-        await Promise.all(
-          Object.entries(tableKeys).map(([table, key]) => uploadLocalIfEmpty(syncState.user.uid, table, key)),
-        );
+      async savePreferences(data) {
+        if (!syncState.user) throw new Error("Not signed in.");
+        await setDoc(settingsRef(syncState.user.uid), data, { merge: true });
       },
     };
 
@@ -310,8 +294,8 @@
   </nav>
 
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbxHyWLD6EKwNQUHuBfvy0M7Cf636iFou4E6ndgtb0sfc8lKfAGPvmRUoPKMRbb1A_5WxA/exec';
-    
+    const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70 };
+
     const Utils = {
       toLocalYYYYMMDD: (dateInput) => {
         if (!dateInput) return '';
@@ -351,16 +335,6 @@
       }
     };
 
-    const getSettings = () => {
-      const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70 };
-      try {
-        const savedSettings = JSON.parse(localStorage.getItem('iui_settings'));
-        return savedSettings ? { ...defaultSettings, ...savedSettings } : defaultSettings;
-      } catch (e) {
-        return defaultSettings;
-      }
-    };
-
     const Store = {
       state: {
         currentView: 'home',
@@ -369,15 +343,16 @@
         daily: [],
         clinic: [],
         iui: [],
-        aiPredictions: JSON.parse(localStorage.getItem('iui_data_ai_predictions')) || [],
-        aiPrediction: JSON.parse(localStorage.getItem('iui_ai_prediction')) || null,
-        apiKey: localStorage.getItem('iui_gemini_api_key') || '',
+        aiPredictions: [],
+        aiPrediction: null,
+        apiKey: '',
+        aiMemos: {},
         syncStatus: 'signed-out',
         syncUserEmail: '',
         activeCycle: null,
         selectedCycleId: null,
         calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        settings: getSettings()
+        settings: defaultSettings
       },
       set(updates) {
         this.state = { ...this.state, ...updates };
@@ -389,10 +364,28 @@
 
     window.addEventListener('firebase-sync-change', (event) => {
       const detail = event.detail || {};
-      Store.set({
+      const updates = {
         syncStatus: detail.status || 'signed-out',
         syncUserEmail: detail.user?.email || '',
-      });
+      };
+
+      if (!detail.user) {
+        Object.assign(updates, {
+          cycles: [],
+          daily: [],
+          clinic: [],
+          iui: [],
+          aiPredictions: [],
+          aiPrediction: null,
+          apiKey: '',
+          aiMemos: {},
+          activeCycle: null,
+          selectedCycleId: null,
+          settings: defaultSettings,
+        });
+      }
+
+      Store.set(updates);
     });
 
     const getFormTitle = (type) => {
@@ -406,78 +399,13 @@
     };
 
     const API = {
-      loadFromCache() {
-        try {
-          const cycles = JSON.parse(localStorage.getItem('iui_data_cycles')) || [];
-          const daily = JSON.parse(localStorage.getItem('iui_data_daily')) || [];
-          const clinic = JSON.parse(localStorage.getItem('iui_data_clinic')) || [];
-          const iui = JSON.parse(localStorage.getItem('iui_data_iui')) || [];
-          const aiPredictions = JSON.parse(localStorage.getItem('iui_data_ai_predictions')) || [];
-          
-          if (cycles.length > 0) {
-            const activeCycle = cycles[cycles.length - 1];
-            Store.set({ cycles, daily, clinic, iui, aiPredictions, activeCycle });
-            
-            const currentAi = aiPredictions.filter(p => p.cycle_id === activeCycle.id).pop();
-            if (currentAi) {
-               Store.set({ aiPrediction: currentAi });
-            } else {
-               Store.set({ aiPrediction: null });
-            }
-            
-            return true;
-          }
-        } catch(e) {
-          console.warn('Cache load error', e);
-        }
-        return false;
-      },
-
-      async fetchAll() {
-        try {
-          const fetchTable = async (t) => (await fetch(`${API_URL}?table=${t}`)).json();
-          const [cycles, daily, clinic, iui, aiPredictions] = await Promise.all([
-            fetchTable('cycles'), fetchTable('daily_records'), fetchTable('clinic_visits'), fetchTable('iui_events'), fetchTable('ai_predictions')
-          ]);
-          
-          cycles.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-          const activeCycle = cycles.length > 0 ? cycles[cycles.length - 1] : null;
-          
-          Store.set({ cycles, daily, clinic, iui, aiPredictions, activeCycle });
-
-          localStorage.setItem('iui_data_cycles', JSON.stringify(cycles));
-          localStorage.setItem('iui_data_daily', JSON.stringify(daily));
-          localStorage.setItem('iui_data_clinic', JSON.stringify(clinic));
-          localStorage.setItem('iui_data_iui', JSON.stringify(iui));
-          localStorage.setItem('iui_data_ai_predictions', JSON.stringify(aiPredictions));
-          
-          if (activeCycle) {
-            const currentAi = aiPredictions.filter(p => p.cycle_id === activeCycle.id).pop();
-            if (currentAi) {
-               Store.set({ aiPrediction: currentAi });
-               localStorage.setItem('iui_ai_prediction', JSON.stringify(currentAi));
-            } else {
-               Store.set({ aiPrediction: null });
-               localStorage.removeItem('iui_ai_prediction');
-            }
-          } else {
-             Store.set({ aiPrediction: null });
-          }
-
-          if (!localStorage.getItem('iui_settings')) {
-            const stats = App.getCycleStats();
-            if (stats.count > 0) {
-              App.updateSettings('cycleLen', stats.avg);
-            }
-          }
-
-          await window.FirebaseSync?.importLocalIfEmpty();
-        } catch (e) {
-          console.warn('Fetch error:', e);
-        }
-      },
-      
       async save(table, payloadData) {
+        if (!window.FirebaseSync?.user) {
+          Utils.showToast('Googleログイン後に保存できます', true);
+          App.navigate('settings');
+          return false;
+        }
+
         const { cycles } = Store.get();
         if (cycles.length === 0 && table !== 'cycles') {
           Utils.showToast('先に周期を登録してください', true);
@@ -505,9 +433,7 @@
         }
 
         const payload = { 
-          action: isUpdate ? 'update' : 'insert',
           id: recordId,
-          table: table,
           cycle_id: cycleId,
           ...payloadData
         };
@@ -530,21 +456,18 @@
           newArray.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
         }
         
-        Store.set({ [targetArrayKey]: newArray });
-        if(table === 'cycles') Store.set({ activeCycle: newArray[newArray.length - 1] });
-        
-        localStorage.setItem(`iui_data_${targetArrayKey}`, JSON.stringify(newArray));
-        
-        App.closeModal();
-        if (table !== 'ai_predictions') {
-           Utils.showToast('保存しました');
-        }
-
         try {
           await window.FirebaseSync?.save(table, localData);
+          Store.set({ [targetArrayKey]: newArray });
+          if(table === 'cycles') Store.set({ activeCycle: newArray[newArray.length - 1] });
+          App.closeModal();
+          if (table !== 'ai_predictions') {
+             Utils.showToast('保存しました');
+          }
         } catch(e) {
           console.warn('Firestore save error:', e);
-          if (table !== 'ai_predictions') Utils.showToast('クラウド保存に遅延が発生しています', true);
+          if (table !== 'ai_predictions') Utils.showToast('保存できませんでした', true);
+          return false;
         }
         
         return true;
@@ -598,7 +521,7 @@
         } else if (aiMemoInputRecord && aiMemoInputRecord.value.trim() !== '') {
            userMemo = aiMemoInputRecord.value.trim();
         } else {
-           userMemo = localStorage.getItem(`iui_ai_memo_${targetCycleId}`) || '';
+           userMemo = Store.get().aiMemos[targetCycleId] || '';
         }
 
         let userMemoText = "";
@@ -779,11 +702,10 @@ ${pastDataText}
           }
           Store.set({ aiPredictions: newAiPredictions });
           
-          API.save('ai_predictions', savePayload);
+          await API.save('ai_predictions', savePayload);
           
           if (activeCycle && targetCycleId === activeCycle.id) {
               Store.set({ aiPrediction: aiPred });
-              localStorage.setItem('iui_ai_prediction', JSON.stringify(aiPred));
           }
           Utils.showToast('AIの分析が完了しました✨');
           
@@ -797,8 +719,31 @@ ${pastDataText}
     };
 
     const Views = {
+      authRequired: () => `
+        <div class="min-h-[70vh] flex items-center justify-center">
+          <div class="w-full max-w-md bg-card rounded-[28px] p-7 shadow-[0_12px_40px_rgba(15,23,42,0.08)] border border-border/40 text-center">
+            <div class="mx-auto mb-5 w-14 h-14 rounded-2xl bg-primary-light text-primary flex items-center justify-center text-3xl">📈</div>
+            <p class="text-xs text-sub font-bold tracking-[0.24em] mb-3">FIREBASE SYNC</p>
+            <h1 class="text-3xl font-serif tracking-wider text-main mb-3">Rhythm</h1>
+            <p class="text-sm text-sub leading-relaxed mb-6">周期・体温・通院記録をFirebaseで安全に同期します。スマホでも同じGoogleアカウントで続きから見られます。</p>
+            <button onclick="App.signInToSync()" class="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-sm active:scale-[0.98] transition-transform">Googleで始める</button>
+            <p class="text-[11px] text-sub leading-relaxed mt-4">このバージョンではGASと端末内保存を使わず、ログイン後のFirestoreを唯一の保存先にしています。</p>
+          </div>
+        </div>
+      `,
+
+      syncing: () => `
+        <div class="min-h-[70vh] flex items-center justify-center">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mx-auto mb-4"></div>
+            <p class="text-sm font-bold text-main">Firebaseから読み込んでいます</p>
+            <p class="text-xs text-sub mt-2">少しだけお待ちください</p>
+          </div>
+        </div>
+      `,
+
       home: () => {
-        const { activeCycle, daily, dashTab, aiPredictions } = Store.get();
+        const { activeCycle, daily, dashTab, aiPredictions, aiMemos } = Store.get();
         
         const headerHtml = `
           <div class="flex justify-between items-center mb-6 mt-4">
@@ -901,7 +846,7 @@ ${pastDataText}
         let aiHtml = '';
         const aiPred = aiPredictions.find(p => p.cycle_id === activeCycle.id);
         const cycleDailyForAI = daily.filter(d => d.cycle_id === activeCycle.id && d.temperature);
-        const savedAiMemo = localStorage.getItem(`iui_ai_memo_${activeCycle.id}`) || '';
+        const savedAiMemo = aiMemos[activeCycle.id] || '';
         
         if (aiPred) {
           aiHtml = `
@@ -920,7 +865,7 @@ ${pastDataText}
                 </div>
                 <div class="mb-4">
                   <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="localStorage.setItem('iui_ai_memo_${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
+                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
                 </div>
                 <div class="text-[12px] text-slate-700 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-blue-100/50">
                   <span class="font-bold mb-1 block text-slate-800">💡 AIからのコメント</span>
@@ -940,7 +885,7 @@ ${pastDataText}
                 <p class="text-[13px] text-slate-800 font-bold mb-4 text-center">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
                 <div class="mb-4">
                   <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="localStorage.setItem('iui_ai_memo_${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
+                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
                 </div>
                 <button onclick="API.analyzeWithAI('${activeCycle.id}')" class="bg-blue-500 text-white w-full py-3.5 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-transform">AIで予測する</button>
               </div>
@@ -1092,7 +1037,7 @@ ${pastDataText}
       },
 
       records: () => {
-        const { daily, clinic, cycles, selectedCycleId, activeCycle, aiPredictions } = Store.get();
+        const { daily, clinic, cycles, selectedCycleId, activeCycle, aiPredictions, aiMemos } = Store.get();
         const targetCycleId = selectedCycleId || (activeCycle ? activeCycle.id : null);
         const targetCycle = cycles.find(c => c.id === targetCycleId);
         const baseTemp = Store.get().settings.baseTemp || 36.70;
@@ -1160,7 +1105,7 @@ ${pastDataText}
 
         let aiHtml = '';
         const targetAiPred = aiPredictions.find(p => p.cycle_id === targetCycleId);
-        const savedAiMemo = localStorage.getItem(`iui_ai_memo_${targetCycleId}`) || '';
+        const savedAiMemo = aiMemos[targetCycleId] || '';
         
         if (targetAiPred) {
           aiHtml = `
@@ -1179,7 +1124,7 @@ ${pastDataText}
                 </div>
                 <div class="mb-4">
                   <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="localStorage.setItem('iui_ai_memo_${targetCycleId}', this.value)">${savedAiMemo}</textarea>
+                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${savedAiMemo}</textarea>
                 </div>
                 <div class="text-[12px] text-slate-700 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-blue-100/50">
                   <span class="font-bold mb-1 block text-slate-800">💡 AIからのコメント</span>
@@ -1199,7 +1144,7 @@ ${pastDataText}
                 <p class="text-[13px] text-slate-800 font-bold mb-4 text-center">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
                 <div class="mb-4 text-left">
                   <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="localStorage.setItem('iui_ai_memo_${targetCycleId}', this.value)">${savedAiMemo}</textarea>
+                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${savedAiMemo}</textarea>
                 </div>
                 <button onclick="API.analyzeWithAI('${targetCycleId}')" class="bg-blue-500 text-white w-full py-3.5 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-transform">AIで予測する</button>
               </div>
@@ -1277,11 +1222,11 @@ ${pastDataText}
       settings: () => {
         const { settings, apiKey, syncStatus, syncUserEmail } = Store.get();
         const stats = App.getCycleStats();
-        const syncLabel = syncStatus === 'synced' ? '同期中' : syncStatus === 'syncing' ? '同期準備中' : syncStatus === 'error' ? '同期エラー' : '未同期';
+        const syncLabel = syncStatus === 'synced' ? 'ログイン中' : syncStatus === 'syncing' ? '接続中' : syncStatus === 'error' ? '接続エラー' : '未ログイン';
         const syncDotClass = syncStatus === 'synced' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-amber-400' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-slate-300';
         const syncButtonHtml = syncStatus === 'signed-out' || syncStatus === 'error'
           ? `<button onclick="App.signInToSync()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-sm active:scale-[0.98] transition-transform">Googleで同期を始める</button>`
-          : `<button onclick="App.signOutFromSync()" class="w-full bg-white border border-border text-main font-bold py-3.5 rounded-xl active:bg-slate-50 transition-colors">同期を解除</button>`;
+          : `<button onclick="App.signOutFromSync()" class="w-full bg-white border border-border text-main font-bold py-3.5 rounded-xl active:bg-slate-50 transition-colors">ログアウト</button>`;
         
         const statHtml = stats.count > 0 
           ? `<div class="flex gap-2 mt-3">
@@ -1337,7 +1282,7 @@ ${pastDataText}
             <div>
               <label class="block text-[13px] text-slate-800 mb-2 font-bold">Gemini APIキー</label>
               <input type="password" id="set-api-key" class="form-control w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-[15px] outline-none" value="${apiKey}" placeholder="AIzaSy..." onchange="App.updateApiKey(this.value)">
-              <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">※キーは端末内(ブラウザ)にのみ安全に保存されます。<br>※基礎体温と過去の実績データから分析を行います。</p>
+              <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">※キーはログイン中のFirebaseデータとして保存されます。<br>※基礎体温と過去の実績データから分析を行います。</p>
             </div>
           </div>
 
@@ -1345,7 +1290,7 @@ ${pastDataText}
           <div class="bg-card rounded-[20px] p-5 shadow-sm border border-border/20 mb-6">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <div class="text-[13px] font-bold text-main">クラウド同期</div>
+                <div class="text-[13px] font-bold text-main">Firebaseアカウント</div>
                 <div class="text-[11px] text-sub mt-1">${syncUserEmail || 'Googleログインで複数端末から同じデータを使えます'}</div>
               </div>
               <div class="flex items-center gap-2 text-[12px] font-bold text-main">
@@ -1353,7 +1298,7 @@ ${pastDataText}
               </div>
             </div>
             ${syncButtonHtml}
-            <p class="text-[10px] text-sub mt-3 leading-relaxed">初回ログイン時、端末内の周期・日次・通院・IUI・AI分析データをFirestoreへアップロードします。以後は保存・削除が自動同期されます。</p>
+            <p class="text-[10px] text-sub mt-3 leading-relaxed">周期・日次・通院・IUI・AI分析・設定はFirestoreに保存されます。このブラウザ単体の端末内保存やGASには保存しません。</p>
           </div>
 
           <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v9.0 Dynamic Mode Switching</p></div>
@@ -1482,27 +1427,21 @@ ${pastDataText}
       chartInstance: null,
 
       async init() {
-        const hasCache = API.loadFromCache();
-        
-        if (hasCache) {
-          if(Store.get().currentView === 'home') this.render();
-          document.getElementById('global-loading').classList.add('hidden');
-        } else {
-          document.getElementById('global-loading').classList.remove('hidden');
-        }
-
-        await API.fetchAll();
-        
-        setTimeout(() => {
-          if(Store.get().currentView === 'home') this.render();
-          document.getElementById('global-loading').classList.add('hidden');
-        }, 300);
+        this.render();
+        document.getElementById('global-loading').classList.add('hidden');
       },
 
       render() {
-        const { currentView } = Store.get();
+        const { currentView, syncStatus } = Store.get();
         const content = document.getElementById('app-content');
-        content.innerHTML = Views[currentView] ? Views[currentView]() : '';
+
+        if (syncStatus === 'signed-out' && currentView !== 'settings') {
+          content.innerHTML = Views.authRequired();
+        } else if (syncStatus === 'syncing' && currentView !== 'settings') {
+          content.innerHTML = Views.syncing();
+        } else {
+          content.innerHTML = Views[currentView] ? Views[currentView]() : '';
+        }
         content.classList.remove('hidden');
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1792,7 +1731,7 @@ ${pastDataText}
         API.save(table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles', payload);
       },
 
-      deleteRecord(table, id, btnEl) {
+      async deleteRecord(table, id, btnEl) {
         if (!btnEl.dataset.confirm) {
            btnEl.dataset.confirm = "true";
            btnEl.classList.add('bg-rose-500', 'text-white');
@@ -1812,21 +1751,19 @@ ${pastDataText}
         const targetArrayKey = table; 
         let newArray = Store.get()[targetArrayKey].filter(item => item.id !== id);
         
-        Store.set({ [targetArrayKey]: newArray });
-        if(table === 'cycles') {
-          Store.set({ activeCycle: newArray.length > 0 ? newArray[newArray.length - 1] : null });
-        }
-        localStorage.setItem(`iui_data_${targetArrayKey}`, JSON.stringify(newArray));
-        
-        App.closeModal();
-        Utils.showToast('削除しました');
-
         const dbTable = table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles';
 
         try {
-          window.FirebaseSync?.delete(dbTable, id);
+          await window.FirebaseSync?.delete(dbTable, id);
+          Store.set({ [targetArrayKey]: newArray });
+          if(table === 'cycles') {
+            Store.set({ activeCycle: newArray.length > 0 ? newArray[newArray.length - 1] : null });
+          }
+          App.closeModal();
+          Utils.showToast('削除しました');
         } catch(e) {
           console.warn('Firestore delete error:', e);
+          Utils.showToast('削除できませんでした', true);
         }
       },
 
@@ -2136,17 +2073,36 @@ ${pastDataText}
       },
 
       updateSettings(key, val) {
-        const s = Store.get().settings;
+        const s = { ...Store.get().settings };
         s[key] = key === 'baseTemp' ? parseFloat(val) : parseInt(val, 10);
         Store.set({ settings: s });
-        localStorage.setItem('iui_settings', JSON.stringify(s));
+        window.FirebaseSync?.savePreferences({ appSettings: s })
+          .catch((e) => {
+            console.warn('Firestore settings save error:', e);
+            Utils.showToast('設定を保存できませんでした', true);
+          });
       },
       
       updateApiKey(val) {
         const key = val.trim();
         Store.set({ apiKey: key });
-        localStorage.setItem('iui_gemini_api_key', key);
-        Utils.showToast('APIキーを保存しました');
+        window.FirebaseSync?.savePreferences({ apiKey: key })
+          .then(() => Utils.showToast('APIキーを保存しました'))
+          .catch((e) => {
+            console.warn('Firestore API key save error:', e);
+            Utils.showToast('APIキーを保存できませんでした', true);
+          });
+      },
+
+      updateAiMemo(cycleId, value) {
+        if (!cycleId) return;
+        const aiMemos = { ...Store.get().aiMemos, [cycleId]: value };
+        Store.set({ aiMemos });
+        window.FirebaseSync?.savePreferences({ aiMemos })
+          .catch((e) => {
+            console.warn('Firestore AI memo save error:', e);
+            Utils.showToast('AIメモを保存できませんでした', true);
+          });
       },
 
       async signInToSync() {
