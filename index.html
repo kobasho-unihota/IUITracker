@@ -181,11 +181,13 @@
         await signOut(auth);
       },
       async save(table, record) {
-        if (!syncState.user || !record?.id) return;
+        if (!syncState.user) throw new Error("Not signed in.");
+        if (!record?.id) throw new Error("Missing record id.");
         await setDoc(doc(tableRef(syncState.user.uid, table), record.id), record);
       },
       async delete(table, id) {
-        if (!syncState.user || !id) return;
+        if (!syncState.user) throw new Error("Not signed in.");
+        if (!id) throw new Error("Missing record id.");
         await deleteDoc(doc(tableRef(syncState.user.uid, table), id));
       },
       async savePreferences(data) {
@@ -461,8 +463,9 @@
           return false;
         }
 
-        const isUpdate = !!payloadData.id;
-        const recordId = payloadData.id || Utils.generateId();
+        const incomingId = typeof payloadData.id === 'string' ? payloadData.id.trim() : payloadData.id;
+        const isUpdate = !!incomingId;
+        const recordId = incomingId || Utils.generateId();
         
         let cycleId = undefined;
         if (table !== 'cycles') {
@@ -481,13 +484,19 @@
           }
         }
 
-        const payload = { 
+        const payload = {
+          ...payloadData,
           id: recordId,
-          cycle_id: cycleId,
-          ...payloadData
         };
+        if (cycleId) {
+          payload.cycle_id = cycleId;
+        } else if (!payload.cycle_id) {
+          delete payload.cycle_id;
+        }
 
-        const localData = { ...payload };
+        const localData = Object.fromEntries(
+          Object.entries(payload).filter(([, value]) => value !== undefined)
+        );
         if(table === 'daily_records' && !localData.lh_result) localData.lh_result = '';
         
         const s = Store.get();
