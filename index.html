@@ -61,7 +61,7 @@
       iui_events: "iui",
       ai_predictions: "aiPredictions",
     };
-    const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70 };
+    const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70, privacyMode: false };
 
     const getActiveCycle = (cycles) => {
       const sorted = [...cycles].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
@@ -122,8 +122,16 @@
     const upsertLocalRows = (key, rows) => {
       const store = window.Store;
       if (!store) return;
-      const sortedRows = key === "cycles"
-        ? [...rows].sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+      const dateKeys = {
+        cycles: "start_date",
+        daily: "date",
+        clinic: "visit_date",
+        iui: "planned_date",
+        aiPredictions: "ovulation_date",
+      };
+      const dateKey = dateKeys[key];
+      const sortedRows = dateKey
+        ? [...rows].sort((a, b) => String(a[dateKey] || "").localeCompare(String(b[dateKey] || "")))
         : rows;
 
       const updates = { [key]: sortedRows };
@@ -241,7 +249,7 @@
         if (!syncState.user) throw new Error("Not signed in.");
         if (!record?.id) throw new Error("Missing record id.");
         ensureOnline();
-        await withWriteTimeout(setDoc(doc(tableRef(syncState.user.uid, table), record.id), record));
+        await withWriteTimeout(setDoc(doc(tableRef(syncState.user.uid, table), record.id), record, { merge: true }));
       },
       async delete(table, id) {
         if (!syncState.user) throw new Error("Not signed in.");
@@ -371,6 +379,44 @@
       color: #1e293b;
       font-weight: 800;
     }
+    .nav-add {
+      width: 58px;
+      height: 58px;
+      margin-top: -22px;
+      border: 5px solid rgba(248, 250, 252, 0.98);
+      border-radius: 22px;
+      background: #1e293b;
+      color: #fff;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+    }
+    .eyebrow {
+      color: #64748b;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border-radius: 999px;
+      padding: 0.45rem 0.7rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+    .timeline-line {
+      position: absolute;
+      left: 19px;
+      top: 40px;
+      bottom: 0;
+      width: 1px;
+      background: #e2e8f0;
+    }
+    .forecast-card {
+      border: 1px dashed #cbd5e1;
+      background: rgba(248, 250, 252, 0.82);
+    }
     .btn-primary {
       background: #334155;
       color: #fff;
@@ -451,18 +497,18 @@
     <div id="modal-body" class="p-5 sm:p-6 flex-1 overflow-y-auto no-scrollbar padding-safe-modal bg-slate-50/80"></div>
   </div>
 
-  <nav class="nav-shell fixed bottom-0 inset-x-0 bg-white/86 backdrop-blur-xl border-t border-border z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
-    <div class="flex justify-around items-center h-[76px] px-2.5 gap-1.5" id="nav-container">
-      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="home" aria-label="ホーム"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></svg>ホーム</button>
-      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="calendar" aria-label="予定"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>予定</button>
-      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="records" aria-label="記録"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 19h14M7 16l1-4 8-8 3 3-8 8-4 1Z"/></svg>記録</button>
-      <button onclick="App.navigate('cycles')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="cycles" aria-label="周期"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7h-5V2M4 17h5v5m10-8a7 7 0 0 1-12 4l-3-3m1-5A7 7 0 0 1 17 6l3 3"/></svg>周期</button>
-      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="settings" aria-label="設定"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-3.5 2-1-2-3-2.2.5a8 8 0 0 0-1.3-.8L15 4h-6l-.5 2.7a8 8 0 0 0-1.3.8L5 7 3 10l2 1a8 8 0 0 0 0 2l-2 1 2 3 2.2-.5a8 8 0 0 0 1.3.8L9 20h6l.5-2.7a8 8 0 0 0 1.3-.8l2.2.5 2-3-2-1a8 8 0 0 0 0-2Z"/></svg>設定</button>
+  <nav class="nav-shell fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-xl border-t border-border z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+    <div class="flex justify-around items-center h-[76px] px-2.5 gap-1" id="nav-container">
+      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="home" aria-label="今日"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></svg>今日</button>
+      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="calendar" aria-label="カレンダー"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>予定</button>
+      <button onclick="App.openModal('quick-add')" class="nav-add shrink-0 flex items-center justify-center" aria-label="記録を追加"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2.2" d="M12 5v14M5 12h14"/></svg></button>
+      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="records" aria-label="振り返り"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 18V9m5 9V5m5 13v-7m5 7V3"/></svg>振り返り</button>
+      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="settings" aria-label="その他"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 7h14M5 12h14M5 17h14"/></svg>その他</button>
     </div>
   </nav>
 
   <script>
-    const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70 };
+    const defaultSettings = { cycleLen: 31, abstainDays: 2, periodDays: 5, baseTemp: 36.70, privacyMode: false };
 
     const Utils = {
       toLocalYYYYMMDD: (dateInput) => {
@@ -568,7 +614,7 @@
         const isTiming = activeCycle && (activeCycle.type === 'タイミング周期' || activeCycle.type === '自然周期');
         return isTiming ? 'タイミング予定・結果' : 'IUI予定・結果';
       }
-      const titles = { daily: '日次記録', clinic: '通院記録', 'new-cycle': '周期の登録・編集', meds: '薬・注射' };
+      const titles = { 'quick-add': '記録を追加', 'export-confirm': 'データの書き出し', daily: '基礎体温', clinic: '通院記録', 'new-cycle': '周期の登録・編集', meds: '薬・注射' };
       return titles[type] || '記録';
     };
 
@@ -964,7 +1010,7 @@ ${pastDataText}
         </div>
       `,
 
-      home: () => {
+      legacyHome: () => {
         const { activeCycle, daily, dashTab, aiPredictions, aiMemos, syncStatus } = Store.get();
         const isSynced = syncStatus === 'synced';
         const syncLabel = isSynced ? '同期済み' : syncStatus === 'error' ? '同期エラー' : '接続中';
@@ -1205,6 +1251,158 @@ ${pastDataText}
               <div class="text-[11px] text-sub mt-1">予定・結果</div>
             </button>
           </div>
+        `;
+      },
+
+      home: () => {
+        const { activeCycle, daily, clinic, iui, settings, syncStatus } = Store.get();
+        const today = Utils.getTodayStr();
+        const isPrivate = Boolean(settings.privacyMode);
+        const privateValue = (value) => isPrivate ? '••••' : Utils.escapeHtml(value);
+        const syncLabel = syncStatus === 'synced' ? 'クラウド同期済み' : '同期を確認中';
+        const todayRecord = daily.find(record => Utils.toLocalYYYYMMDD(record.date) === today);
+        const upcomingVisits = clinic
+          .filter(record => record.next_visit_date && Utils.toLocalYYYYMMDD(record.next_visit_date) >= today)
+          .sort((a, b) => String(a.next_visit_date).localeCompare(String(b.next_visit_date)));
+        const upcomingEvents = iui
+          .filter(record => !record.actual_date && record.planned_date && Utils.toLocalYYYYMMDD(record.planned_date) >= today)
+          .sort((a, b) => String(a.planned_date).localeCompare(String(b.planned_date)));
+
+        const timeline = [
+          ...daily.map(record => ({ ...record, kind: 'daily', sortDate: record.date })),
+          ...clinic.map(record => ({ ...record, kind: 'clinic', sortDate: record.visit_date })),
+          ...iui.map(record => ({ ...record, kind: 'iui', sortDate: record.actual_date || record.planned_date })),
+        ]
+          .filter(record => record.sortDate)
+          .sort((a, b) => String(b.sortDate).localeCompare(String(a.sortDate)))
+          .slice(0, 4);
+
+        const timelineHtml = timeline.length ? timeline.map((record, index) => {
+          const labels = {
+            daily: ['基礎体温', `${record.temperature || '-'} ℃`, 'bg-rose-50 text-rose-600'],
+            clinic: ['通院', record.next_visit_date ? `次回 ${Utils.formatMMDD(record.next_visit_date)}` : '受診記録', 'bg-sky-50 text-sky-600'],
+            iui: [record.actual_date ? '実施記録' : '病院からの予定', record.actual_date ? '実施済み' : '予定', 'bg-indigo-50 text-indigo-600'],
+          };
+          const [title, value, color] = labels[record.kind];
+          return `
+            <button type="button" onclick="App.openModal('${record.kind}', '${Utils.escapeHtml(record.id)}')" class="relative w-full flex gap-3 text-left pb-4 last:pb-0">
+              ${index < timeline.length - 1 ? '<span class="timeline-line" aria-hidden="true"></span>' : ''}
+              <span class="relative z-10 w-10 h-10 rounded-2xl ${color} flex items-center justify-center text-[12px] font-black">${record.kind === 'daily' ? '℃' : record.kind === 'clinic' ? '診' : '予'}</span>
+              <span class="flex-1 min-w-0 pt-0.5">
+                <span class="block text-[13px] font-bold text-main">${title}</span>
+                <span class="block text-[12px] text-sub mt-1">${privateValue(Utils.toLocalYYYYMMDD(record.sortDate).replace(/-/g, '/'))} · ${privateValue(value)}</span>
+              </span>
+              <span class="text-slate-300 pt-2">›</span>
+            </button>
+          `;
+        }).join('') : '<p class="text-sm text-sub py-4">まだ記録がありません。</p>';
+
+        const header = `
+          <header class="flex items-start justify-between gap-4 mb-7">
+            <div>
+              <p class="eyebrow">${today.replace(/-/g, '.')}</p>
+              <h1 class="text-[30px] leading-tight font-bold tracking-tight text-main mt-1">今日のRhythm</h1>
+            </div>
+            <button onclick="App.togglePrivacy()" class="w-11 h-11 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center text-main" aria-label="${isPrivate ? '数値を表示する' : '数値を隠す'}">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${isPrivate ? 'M3 3l18 18M10.7 10.7a2 2 0 0 0 2.6 2.6M9.9 4.2A10.7 10.7 0 0 1 21 12a11.8 11.8 0 0 1-2.1 3.1M6.6 6.6A11.5 11.5 0 0 0 3 12a10.8 10.8 0 0 0 8.3 7.7' : 'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Zm9.5 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z'}"/></svg>
+            </button>
+          </header>
+        `;
+
+        if (!activeCycle) {
+          return header + `
+            <section class="card-soft rounded-[30px] p-7">
+              <span class="status-chip bg-slate-100 text-slate-700 mb-5">はじめに</span>
+              <h2 class="text-2xl font-bold text-main">周期を登録すると始められます</h2>
+              <p class="text-sm text-sub leading-7 mt-3 mb-6">生理開始日を基準に、体温・通院・予定をひとつの流れで整理します。</p>
+              <button onclick="App.openModal('new-cycle')" class="btn-primary w-full py-4 rounded-2xl font-bold">最初の周期を登録</button>
+            </section>
+          `;
+        }
+
+        const cycleDay = Math.max(1, Math.floor((new Date(today) - new Date(activeCycle.start_date)) / 86400000) + 1);
+        const cycleDaily = daily.filter(record => record.cycle_id === activeCycle.id);
+        const measuredDays = new Set(cycleDaily.filter(record => record.temperature).map(record => Utils.toLocalYYYYMMDD(record.date))).size;
+        const expectedDays = Math.max(1, Math.min(cycleDay, Number(settings.cycleLen) || 31));
+        const progress = Math.min(100, Math.round((measuredDays / expectedDays) * 100));
+        const predictions = App.getPredictions();
+        const isTiming = activeCycle.type === 'タイミング周期' || activeCycle.type === '自然周期';
+        const eventLabel = isTiming ? 'タイミング' : 'IUI';
+        const nextConfirmed = [
+          ...upcomingVisits.map(record => ({ label: '次回通院', date: record.next_visit_date, source: '病院からの予定', action: `App.openModal('clinic', '${Utils.escapeHtml(record.id)}')` })),
+          ...upcomingEvents.map(record => ({ label: `${eventLabel}予定`, date: record.planned_date, source: '登録済みの予定', action: `App.openModal('iui', '${Utils.escapeHtml(record.id)}')` })),
+        ].sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+
+        return header + `
+          <section class="hero-card rounded-[32px] p-6 mb-5 overflow-hidden relative">
+            <div class="absolute -right-16 -top-20 w-52 h-52 rounded-full bg-white/[0.06]"></div>
+            <div class="relative">
+              <div class="flex items-center justify-between gap-3">
+                <span class="status-chip bg-white/10 border border-white/15 text-white">${privateValue(activeCycle.type || '周期タイプ未設定')}</span>
+                <button onclick="App.openModal('new-cycle', '${Utils.escapeHtml(activeCycle.id)}')" class="text-[12px] font-bold text-white/70 py-2 px-3">編集</button>
+              </div>
+              <div class="mt-7">
+                <p class="text-white/60 text-sm">現在の周期</p>
+                <div class="flex items-end gap-2 mt-1">
+                  <strong class="text-5xl tracking-tight">${privateValue(cycleDay)}</strong>
+                  <span class="text-white/70 font-bold pb-1.5">日目</span>
+                </div>
+              </div>
+              <div class="mt-7">
+                <div class="flex justify-between text-[12px] text-white/70 mb-2"><span>今周期の体温記録</span><span>${privateValue(`${measuredDays}/${expectedDays}日`)}</span></div>
+                <div class="h-2 rounded-full bg-white/15 overflow-hidden"><div class="h-full rounded-full bg-cyan-300" style="width:${progress}%"></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card-soft rounded-[28px] p-5 mb-5">
+            <div class="flex items-center justify-between mb-4">
+              <div><p class="eyebrow">Today</p><h2 class="text-xl font-bold mt-1">今日やること</h2></div>
+              <span class="status-chip ${todayRecord ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${todayRecord ? '記録済み' : '未記録'}</span>
+            </div>
+            <button onclick="App.openModal('daily', '${todayRecord ? Utils.escapeHtml(todayRecord.id) : ''}', '${today}')" class="w-full rounded-[22px] ${todayRecord ? 'bg-emerald-50/70 border-emerald-100' : 'bg-slate-900 border-slate-900 text-white'} border p-4 flex items-center gap-4 text-left">
+              <span class="w-11 h-11 rounded-2xl ${todayRecord ? 'bg-white text-emerald-600' : 'bg-white/10 text-white'} flex items-center justify-center font-black">℃</span>
+              <span class="flex-1">
+                <span class="block font-bold">${todayRecord ? '今日の体温を確認・編集' : '今日の基礎体温を記録'}</span>
+                <span class="block text-[12px] mt-1 ${todayRecord ? 'text-emerald-700/70' : 'text-white/60'}">${todayRecord ? `${privateValue(`${todayRecord.temperature} ℃`)} を保存済み` : '日々の変化をあとから振り返れます'}</span>
+              </span>
+              <span class="${todayRecord ? 'text-emerald-300' : 'text-white/40'} text-xl">›</span>
+            </button>
+          </section>
+
+          <section class="card-soft rounded-[28px] p-5 mb-5">
+            <p class="eyebrow mb-1">Next</p>
+            <h2 class="text-xl font-bold mb-4">次の確定予定</h2>
+            ${nextConfirmed ? `
+              <button onclick="${nextConfirmed.action}" class="w-full text-left rounded-[20px] border border-sky-100 bg-sky-50/70 p-4 flex items-center gap-4">
+                <span class="w-12 h-12 rounded-2xl bg-white text-sky-600 flex items-center justify-center font-black">予</span>
+                <span class="flex-1"><span class="block text-[12px] font-bold text-sky-700">${nextConfirmed.source}</span><span class="block text-lg font-bold text-main mt-1">${privateValue(nextConfirmed.label)} · ${privateValue(Utils.formatMMDD(nextConfirmed.date))}</span></span>
+                <span class="text-sky-300">›</span>
+              </button>
+            ` : `<div class="rounded-[20px] bg-slate-50 p-5 text-sm text-sub">確定した予定はありません。中央の＋から通院や${eventLabel}予定を追加できます。</div>`}
+          </section>
+
+          <section class="card-soft rounded-[28px] p-5 mb-5">
+            <div class="flex items-end justify-between mb-5">
+              <div><p class="eyebrow">Recent</p><h2 class="text-xl font-bold mt-1">最近の記録</h2></div>
+              <button onclick="App.navigate('records')" class="text-[12px] font-bold text-sub px-2 py-2">すべて見る</button>
+            </div>
+            <div>${timelineHtml}</div>
+          </section>
+
+          <details class="forecast-card rounded-[24px] p-5 mb-5">
+            <summary class="cursor-pointer list-none flex items-center justify-between gap-3">
+              <div><span class="status-chip bg-white text-slate-600 border border-border mb-2">参考予測</span><h2 class="text-base font-bold">今周期の見通し</h2></div>
+              <span class="text-slate-400">＋</span>
+            </summary>
+            <div class="grid grid-cols-2 gap-3 mt-5">
+              <div class="bg-white rounded-2xl p-4 border border-border"><p class="text-[12px] text-sub">${eventLabel}目安</p><p class="text-lg font-bold mt-1">${privateValue(predictions.iui ? Utils.formatMMDD(predictions.iui) : '-')}</p></div>
+              <div class="bg-white rounded-2xl p-4 border border-border"><p class="text-[12px] text-sub">次回生理目安</p><p class="text-lg font-bold mt-1">${privateValue(predictions.period ? Utils.formatMMDD(predictions.period) : '-')}</p></div>
+            </div>
+            <p class="text-[12px] leading-6 text-sub mt-4">過去の記録から算出した参考値です。診断や医療機関からの指示ではありません。</p>
+          </details>
+
+          <p class="text-center text-[11px] text-sub pb-2">${syncLabel}</p>
         `;
       },
 
@@ -1490,9 +1688,9 @@ ${pastDataText}
 
         return `
           <div class="mb-6">
-            <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">RECORDS</p>
-            <h1 class="text-3xl font-serif tracking-wider text-main font-bold">記録</h1>
-            <p class="text-xs text-sub mt-2">体温の変化と通院履歴を周期ごとに確認</p>
+            <p class="eyebrow">Review</p>
+            <h1 class="text-3xl tracking-tight text-main font-bold mt-1">振り返り</h1>
+            <p class="text-sm text-sub mt-2">実測データと通院履歴を周期ごとに確認します</p>
           </div>
           
           ${cycleSelectorHtml}
@@ -1554,9 +1752,10 @@ ${pastDataText}
         return `
           <div class="mb-6 flex justify-between items-end gap-4">
             <div>
-              <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">CYCLES</p>
-              <h1 class="text-3xl font-serif tracking-wider text-main font-bold">周期</h1>
-              <p class="text-xs text-sub mt-2">これまでの周期を確認・編集</p>
+              <button onclick="App.navigate('settings')" class="text-[12px] font-bold text-sub mb-4">‹ その他へ戻る</button>
+              <p class="eyebrow">Cycles</p>
+              <h1 class="text-3xl tracking-tight text-main font-bold mt-1">周期の管理</h1>
+              <p class="text-sm text-sub mt-2">これまでの周期を確認・編集</p>
             </div>
             <button onclick="App.openModal('new-cycle')" class="btn-primary shrink-0 px-4 py-2.5 rounded-full text-sm font-bold">＋ 新規</button>
           </div>
@@ -1585,9 +1784,28 @@ ${pastDataText}
 
         return `
           <div class="mb-6">
-            <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">SETTINGS</p>
-            <h1 class="text-3xl font-serif tracking-wider text-main font-bold">設定</h1>
-            <p class="text-xs text-sub mt-2">予測条件とクラウド同期を管理</p>
+            <p class="eyebrow">More</p>
+            <h1 class="text-3xl tracking-tight text-main font-bold mt-1">その他</h1>
+            <p class="text-sm text-sub mt-2">周期、表示、データ、同期を管理します</p>
+          </div>
+
+          <h2 class="text-sm font-bold text-main mb-3 ml-1">管理</h2>
+          <div class="card-soft rounded-[28px] p-2 mb-6">
+            <button onclick="App.navigate('cycles')" class="w-full p-4 flex items-center gap-4 text-left rounded-[20px] active:bg-slate-50">
+              <span class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-black">周</span>
+              <span class="flex-1"><span class="block font-bold text-main">周期の管理</span><span class="block text-[12px] text-sub mt-1">開始日・治療タイプ・状態を編集</span></span><span class="text-slate-300">›</span>
+            </button>
+            <div class="h-px bg-border mx-4"></div>
+            <button onclick="App.togglePrivacy()" class="w-full p-4 flex items-center gap-4 text-left rounded-[20px] active:bg-slate-50">
+              <span class="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-black">秘</span>
+              <span class="flex-1"><span class="block font-bold text-main">プライバシー表示</span><span class="block text-[12px] text-sub mt-1">ホームの数値を${settings.privacyMode ? '隠しています' : '表示しています'}</span></span>
+              <span class="status-chip ${settings.privacyMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-sub'}">${settings.privacyMode ? 'ON' : 'OFF'}</span>
+            </button>
+            <div class="h-px bg-border mx-4"></div>
+            <button onclick="App.exportData()" class="w-full p-4 flex items-center gap-4 text-left rounded-[20px] active:bg-slate-50">
+              <span class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">出</span>
+              <span class="flex-1"><span class="block font-bold text-main">データを書き出す</span><span class="block text-[12px] text-sub mt-1">全記録をJSON形式で端末へ保存</span></span><span class="text-slate-300">›</span>
+            </button>
           </div>
           
           <h2 class="text-sm font-bold text-main mb-3 ml-1">周期設定</h2>
@@ -1654,12 +1872,53 @@ ${pastDataText}
             <p class="text-[10px] text-sub mt-3 leading-relaxed">周期・日次・通院・IUI・AI分析・設定はFirestoreに保存されます。このブラウザ単体の端末内保存やGASには保存しません。</p>
           </div>
 
-          <div class="mt-12 text-center text-[10px] text-slate-400 pb-10"><p>Developed for Shogo</p><p class="mt-1">v9.0 Dynamic Mode Switching</p></div>
+          <div class="mt-12 text-center text-[11px] text-slate-400 pb-10"><p>Rhythm</p><p class="mt-1">Firebase cloud edition</p></div>
         `;
       }
     };
 
     const Forms = {
+      'export-confirm': () => {
+        const { cycles, daily, clinic, iui, aiPredictions } = Store.get();
+        const total = cycles.length + daily.length + clinic.length + iui.length + aiPredictions.length;
+        return `
+          <div class="rounded-[22px] border border-amber-200 bg-amber-50 p-5 mb-5">
+            <p class="font-bold text-amber-900">医療情報を含むファイルです</p>
+            <p class="text-[13px] leading-6 text-amber-800 mt-2">書き出すJSONファイルは暗号化されません。共有端末では保存先と取り扱いに注意してください。</p>
+          </div>
+          <div class="card-soft rounded-[22px] p-5 mb-5">
+            <div class="flex justify-between text-sm py-2"><span class="text-sub">周期</span><strong>${cycles.length}件</strong></div>
+            <div class="flex justify-between text-sm py-2 border-t border-border/60"><span class="text-sub">基礎体温</span><strong>${daily.length}件</strong></div>
+            <div class="flex justify-between text-sm py-2 border-t border-border/60"><span class="text-sub">通院</span><strong>${clinic.length}件</strong></div>
+            <div class="flex justify-between text-sm py-2 border-t border-border/60"><span class="text-sub">IUI・タイミング</span><strong>${iui.length}件</strong></div>
+            <div class="flex justify-between text-sm py-2 border-t border-border/60"><span class="text-sub">参考予測</span><strong>${aiPredictions.length}件</strong></div>
+            <div class="flex justify-between text-sm pt-4 mt-2 border-t border-slate-300"><span class="font-bold">合計</span><strong>${total}件</strong></div>
+          </div>
+          <button onclick="App.confirmExport()" class="btn-primary w-full py-4 rounded-2xl font-bold">内容を確認して書き出す</button>
+          <button onclick="App.closeModal(true)" class="w-full mt-3 py-3 rounded-2xl text-sm font-bold text-sub">キャンセル</button>
+        `;
+      },
+      'quick-add': () => `
+        <p class="text-sm text-sub leading-6 mb-5">追加したい記録を選んでください。入力済みの日付を選ぶと、その記録を編集できます。</p>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="App.openModal('daily')" class="col-span-2 rounded-[22px] bg-slate-900 text-white p-5 flex items-center gap-4 text-left">
+            <span class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-xl font-black">℃</span>
+            <span class="flex-1"><span class="block text-base font-bold">基礎体温</span><span class="block text-[12px] text-white/60 mt-1">今日の測定値をすばやく記録</span></span><span class="text-white/40">›</span>
+          </button>
+          <button onclick="App.openModal('clinic')" class="rounded-[22px] bg-sky-50 border border-sky-100 p-4 text-left">
+            <span class="w-10 h-10 rounded-2xl bg-white text-sky-700 flex items-center justify-center font-black mb-4">診</span>
+            <span class="block text-sm font-bold text-main">通院</span><span class="block text-[11px] text-sub mt-1">受診・次回予定</span>
+          </button>
+          <button onclick="App.openModal('iui')" class="rounded-[22px] bg-indigo-50 border border-indigo-100 p-4 text-left">
+            <span class="w-10 h-10 rounded-2xl bg-white text-indigo-700 flex items-center justify-center font-black mb-4">予</span>
+            <span class="block text-sm font-bold text-main">IUI・タイミング</span><span class="block text-[11px] text-sub mt-1">予定・実施結果</span>
+          </button>
+          <button onclick="App.openModal('new-cycle')" class="col-span-2 rounded-[22px] bg-white border border-border p-4 flex items-center gap-4 text-left">
+            <span class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center font-black">周</span>
+            <span class="flex-1"><span class="block text-sm font-bold text-main">新しい周期</span><span class="block text-[11px] text-sub mt-1">生理開始日と周期タイプを登録</span></span><span class="text-slate-300">›</span>
+          </button>
+        </div>
+      `,
       daily: (id, defaultDate) => {
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().daily.find(x => x.id === id) || {};
@@ -1671,7 +1930,8 @@ ${pastDataText}
           <div id="form-existing-note" class="${r.id ? '' : 'hidden'} mb-4 rounded-xl bg-sky-50 border border-sky-100 px-3.5 py-3 text-[12px] font-bold text-sky-700">この日の記録を編集中です</div>
           <div class="mb-5">
             <label class="field-label" for="form-date">日付 <span class="field-required">必須</span></label>
-            <input type="date" id="form-date" class="form-control px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" onchange="App.checkExistingDaily(this.value)" required>
+            <input type="date" id="form-date" class="form-control px-4 py-3 text-[16px] outline-none disabled:bg-slate-100 disabled:text-sub" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" ${r.id ? 'disabled' : 'onchange="App.checkExistingDaily(this.value)"'} required>
+            ${r.id ? '<p class="field-hint">重複を防ぐため、保存済み記録の日付は変更できません。</p>' : ''}
           </div>
           <div class="mb-5">
             <label class="field-label" for="form-temp">基礎体温 <span class="field-required">必須</span></label>
@@ -1745,9 +2005,14 @@ ${pastDataText}
               <div class="text-[11px] text-sub mt-0.5" id="form-actual-text">${isDone ? `${eventLabel}済みとして記録されています` : '未実施（予定）'}</div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="form-actual-check" class="sr-only peer" aria-label="${eventLabel}を実施済みにする" ${isDone ? 'checked' : ''} onchange="document.getElementById('form-actual-text').innerText = this.checked ? '${eventLabel}済みとして記録されます' : '未実施（予定）'">
+              <input type="checkbox" id="form-actual-check" class="sr-only peer" aria-label="${eventLabel}を実施済みにする" ${isDone ? 'checked' : ''} onchange="App.toggleActualDate(this.checked, '${eventLabel}')">
               <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
+          </div>
+          <div id="form-actual-date-wrap" class="${isDone ? '' : 'hidden'} mb-6">
+            <label class="field-label" for="form-actual-date">実施日 <span class="field-required">必須</span></label>
+            <input type="date" id="form-actual-date" class="form-control px-4 py-3 text-[16px] outline-none" value="${r.actual_date ? Utils.toLocalYYYYMMDD(r.actual_date) : dateVal}">
+            <p class="field-hint">予定から変更になった場合も、実際の日付を残せます。</p>
           </div>
           
           <input type="hidden" id="form-id" value="${r.id || ''}">
@@ -2026,7 +2291,7 @@ ${pastDataText}
               pointRadius: pointRadii,
               pointStyle: pointStyles,
               tension: 0.3,
-              spanGaps: true
+              spanGaps: false
             }]
           },
           options: {
@@ -2182,6 +2447,14 @@ ${pastDataText}
         button.innerText = isSaving ? '保存しています…' : (button.dataset.defaultLabel || '保存する');
       },
 
+      toggleActualDate(isDone, eventLabel) {
+        const wrap = document.getElementById('form-actual-date-wrap');
+        const text = document.getElementById('form-actual-text');
+        wrap?.classList.toggle('hidden', !isDone);
+        if (text) text.innerText = isDone ? `${eventLabel}済みとして実施日を保存します` : '未実施（予定）';
+        this.modalDirty = true;
+      },
+
       validateForm(table, payload) {
         if (table === 'daily') {
           if (!payload.date) return '日付を選択してください。';
@@ -2199,7 +2472,10 @@ ${pastDataText}
             return '次回受診日は受診日以降の日付を選択してください。';
           }
         }
-        if (table === 'iui' && !payload.planned_date) return '予定日を選択してください。';
+        if (table === 'iui') {
+          if (!payload.planned_date) return '予定日を選択してください。';
+          if (payload.is_done && !payload.actual_date) return '実施日を選択してください。';
+        }
         if (table === 'cycles') {
           if (!payload.start_date) return '生理開始日を選択してください。';
           if (payload.start_date > Utils.getTodayStr()) return '生理開始日は今日以前の日付を選択してください。';
@@ -2231,7 +2507,8 @@ ${pastDataText}
           payload.next_visit_date = document.getElementById('form-next').value;
         } else if (table === 'iui') {
           payload.planned_date = document.getElementById('form-planned').value;
-          payload.actual_date = document.getElementById('form-actual-check').checked ? payload.planned_date : '';
+          payload.is_done = document.getElementById('form-actual-check').checked;
+          payload.actual_date = payload.is_done ? document.getElementById('form-actual-date').value : '';
         } else if (table === 'cycles') {
           payload.start_date = document.getElementById('form-date').value;
           payload.type = document.getElementById('form-type').value;
@@ -2244,6 +2521,7 @@ ${pastDataText}
           return;
         }
         if (table === 'daily') payload.temperature = Number(payload.temperature).toFixed(2);
+        delete payload.is_done;
 
         this.setFormError('');
         this.setSubmitState(true);
@@ -2370,7 +2648,9 @@ ${pastDataText}
         const avgIuiPhase = countIuiPhase > 0 ? Math.round(totalIuiPhase / countIuiPhase) : (settings.cycleLen > 14 ? settings.cycleLen - 14 : 14);
         const avgLutealPhase = countLutealPhase > 0 ? Math.round(totalLutealPhase / countLutealPhase) : 14;
         
-        const cycleIUI = iui.filter(i => i.cycle_id === activeCycle.id);
+        const cycleIUI = iui
+          .filter(i => i.cycle_id === activeCycle.id)
+          .sort((a, b) => String(a.actual_date || a.planned_date || '').localeCompare(String(b.actual_date || b.planned_date || '')));
         const latestIUI = cycleIUI[cycleIUI.length - 1];
         
         const startD = activeCycle.start_date;
@@ -2648,6 +2928,48 @@ ${pastDataText}
           Store.set({ aiMemos: previous });
           Utils.showToast('AIメモを保存できませんでした。元の内容に戻しました', true);
         }
+      },
+
+      async togglePrivacy() {
+        const previous = Boolean(Store.get().settings.privacyMode);
+        Store.set({ settings: { ...Store.get().settings, privacyMode: !previous } });
+        try {
+          await window.FirebaseSync?.saveSetting('privacyMode', !previous);
+        } catch (e) {
+          console.warn('Privacy setting save error:', e);
+          Store.set({ settings: { ...Store.get().settings, privacyMode: previous } });
+          Utils.showToast('表示設定を保存できませんでした', true);
+        }
+      },
+
+      exportData() {
+        this.openModal('export-confirm');
+      },
+
+      confirmExport() {
+        const { cycles, daily, clinic, iui, aiPredictions, aiMemos, settings } = Store.get();
+        const payload = {
+          exportedAt: new Date().toISOString(),
+          formatVersion: 1,
+          cycles,
+          dailyRecords: daily,
+          clinicVisits: clinic,
+          iuiEvents: iui,
+          aiPredictions,
+          aiMemos,
+          settings,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `rhythm-backup-${Utils.getTodayStr()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        this.closeModal(true);
+        Utils.showToast('データを書き出しました');
       },
 
       async signInToSync() {
