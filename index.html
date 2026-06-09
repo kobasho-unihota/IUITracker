@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   
   <!-- PWA & iOS Home Screen Settings -->
   <title>Rhythm</title>
@@ -38,6 +38,7 @@
       getFirestore,
       onSnapshot,
       setDoc,
+      updateDoc,
     } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -72,6 +73,10 @@
       status: "signed-out",
       unsubscribers: [],
       snapshots: {},
+      loadedTables: new Set(),
+      settingsLoaded: false,
+      syncGeneration: 0,
+      errors: new Set(),
     };
 
     const notify = () => {
@@ -85,6 +90,34 @@
 
     const tableRef = (uid, table) => collection(db, "users", uid, "iuiTracker", table, "records");
     const settingsRef = (uid) => doc(db, "users", uid, "iuiTrackerMeta", "settings");
+    const ensureOnline = () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        throw new Error("OFFLINE");
+      }
+    };
+    const withWriteTimeout = (promise, timeoutMs = 15000) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("WRITE_TIMEOUT")), timeoutMs);
+      Promise.resolve(promise).then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+    const updateSyncReadyState = () => {
+      if (
+        syncState.settingsLoaded
+        && syncState.loadedTables.size === Object.keys(tableKeys).length
+        && syncState.errors.size === 0
+      ) {
+        syncState.status = "synced";
+        notify();
+      }
+    };
 
     const upsertLocalRows = (key, rows) => {
       const store = window.Store;
@@ -110,25 +143,32 @@
     };
 
     const startSync = async (user) => {
+      const generation = ++syncState.syncGeneration;
       syncState.status = "syncing";
       notify();
 
       syncState.unsubscribers.forEach((unsubscribe) => unsubscribe());
       syncState.unsubscribers = [];
       syncState.snapshots = {};
+      syncState.loadedTables = new Set();
+      syncState.settingsLoaded = false;
+      syncState.errors = new Set();
 
       const existingSettings = await getDoc(settingsRef(user.uid));
+      if (generation !== syncState.syncGeneration || syncState.user?.uid !== user.uid) return;
       if (!existingSettings.exists()) {
         await setDoc(settingsRef(user.uid), {
           appSettings: defaultSettings,
           apiKey: "",
           aiMemos: {},
         });
+        if (generation !== syncState.syncGeneration || syncState.user?.uid !== user.uid) return;
       }
 
       const unsubscribeSettings = onSnapshot(
         settingsRef(user.uid),
         (snapshot) => {
+          if (generation !== syncState.syncGeneration || syncState.user?.uid !== user.uid) return;
           const data = snapshot.data() || {};
           const store = window.Store;
           if (!store) return;
@@ -137,9 +177,13 @@
             apiKey: data.apiKey || "",
             aiMemos: data.aiMemos || {},
           });
+          syncState.settingsLoaded = true;
+          updateSyncReadyState();
         },
         (error) => {
+          if (generation !== syncState.syncGeneration || syncState.user?.uid !== user.uid) return;
           console.error("Firestore settings sync error:", error);
+          syncState.errors.add("settings");
           syncState.status = "error";
           notify();
         },
@@ -150,13 +194,16 @@
         const unsubscribe = onSnapshot(
           tableRef(user.uid, table),
           (snapshot) => {
-            syncState.snapshots[key] = snapshot.docs.map((item) => item.data());
+            if (generation !== syncState.syncGeneration || syncState.user?.uid !== user.uid) return;
+            syncState.snapshots[key] = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }));
+            syncState.loadedTables.add(key);
             upsertLocalRows(key, syncState.snapshots[key]);
-            syncState.status = "synced";
-            notify();
+            updateSyncReadyState();
           },
           (error) => {
+            if (generation !== syncState.syncGeneration || syncState.user?.uid !== user.uid) return;
             console.error("Firestore sync error:", error);
+            syncState.errors.add(key);
             syncState.status = "error";
             notify();
           },
@@ -175,24 +222,47 @@
       async signIn() {
         syncState.status = "syncing";
         notify();
-        await signInWithPopup(auth, provider);
+        try {
+          await signInWithPopup(auth, provider);
+        } catch (error) {
+          syncState.status = syncState.user ? "synced" : "signed-out";
+          notify();
+          throw error;
+        }
       },
       async signOut() {
         await signOut(auth);
       },
+      async retry() {
+        if (!syncState.user) throw new Error("Not signed in.");
+        await startSync(syncState.user);
+      },
       async save(table, record) {
         if (!syncState.user) throw new Error("Not signed in.");
         if (!record?.id) throw new Error("Missing record id.");
-        await setDoc(doc(tableRef(syncState.user.uid, table), record.id), record);
+        ensureOnline();
+        await withWriteTimeout(setDoc(doc(tableRef(syncState.user.uid, table), record.id), record));
       },
       async delete(table, id) {
         if (!syncState.user) throw new Error("Not signed in.");
         if (!id) throw new Error("Missing record id.");
-        await deleteDoc(doc(tableRef(syncState.user.uid, table), id));
+        ensureOnline();
+        await withWriteTimeout(deleteDoc(doc(tableRef(syncState.user.uid, table), id)));
       },
-      async savePreferences(data) {
+      async saveSetting(key, value) {
         if (!syncState.user) throw new Error("Not signed in.");
-        await setDoc(settingsRef(syncState.user.uid), data, { merge: true });
+        ensureOnline();
+        await withWriteTimeout(updateDoc(settingsRef(syncState.user.uid), { [`appSettings.${key}`]: value }));
+      },
+      async saveApiKey(value) {
+        if (!syncState.user) throw new Error("Not signed in.");
+        ensureOnline();
+        await withWriteTimeout(updateDoc(settingsRef(syncState.user.uid), { apiKey: value }));
+      },
+      async saveAiMemo(cycleId, value) {
+        if (!syncState.user) throw new Error("Not signed in.");
+        ensureOnline();
+        await withWriteTimeout(updateDoc(settingsRef(syncState.user.uid), { [`aiMemos.${cycleId}`]: value }));
       },
     };
 
@@ -200,6 +270,7 @@
       syncState.user = user;
 
       if (!user) {
+        syncState.syncGeneration++;
         syncState.unsubscribers.forEach((unsubscribe) => unsubscribe());
         syncState.unsubscribers = [];
         syncState.status = "signed-out";
@@ -243,6 +314,7 @@
     html, body {
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
+      min-height: 100%;
       background:
         radial-gradient(circle at 18% 0%, rgba(226, 232, 240, 0.95), transparent 34rem),
         linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
@@ -293,10 +365,53 @@
       min-height: 54px;
       border-radius: 18px;
     }
+    .nav-btn svg { width: 21px; height: 21px; stroke-width: 1.9; }
     .nav-btn.text-primary {
       background: rgba(226, 232, 240, 0.74);
       color: #1e293b;
       font-weight: 800;
+    }
+    .btn-primary {
+      background: #334155;
+      color: #fff;
+      box-shadow: 0 12px 28px rgba(51, 65, 85, 0.18);
+      transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+    }
+    .btn-primary:active { transform: scale(0.985); }
+    .btn-primary:disabled { opacity: 0.62; cursor: wait; box-shadow: none; }
+    .field-label { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.45rem; font-size: 0.8rem; font-weight: 750; color: #334155; }
+    .field-required { color: #e11d48; font-size: 0.65rem; font-weight: 800; }
+    .field-hint { margin-top: 0.45rem; font-size: 0.68rem; line-height: 1.55; color: #64748b; }
+    .form-control {
+      min-height: 50px;
+      border-radius: 14px !important;
+      border: 1px solid rgba(203, 213, 225, 0.95) !important;
+      background: rgba(255, 255, 255, 0.92) !important;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+    .form-control:focus {
+      border-color: #64748b !important;
+      box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.18);
+      background: #fff !important;
+    }
+    select.form-control {
+      padding-right: 2.75rem !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m7 10 5 5 5-5'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 0.9rem center !important;
+      background-size: 1rem !important;
+    }
+    .form-error {
+      border: 1px solid rgba(251, 113, 133, 0.35);
+      background: rgba(255, 241, 242, 0.96);
+      color: #be123c;
+    }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(56, 189, 248, 0.35);
+      outline-offset: 2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
     @media (min-width: 768px) {
       .nav-shell { bottom: 18px; border-radius: 999px; border: 1px solid rgba(226, 232, 240, 0.9); }
@@ -305,7 +420,7 @@
     
     /* フォーム要素のはみ出し防止 */
     *, *::before, *::after { box-sizing: border-box; }
-    .form-control { 
+    .form-control {
       width: 100% !important; 
       max-width: 100% !important; 
       box-sizing: border-box !important; 
@@ -316,31 +431,33 @@
 </head>
 <body class="text-main font-sans antialiased overflow-x-hidden">
 
-  <div id="global-loading" class="fixed inset-0 bg-white/90 z-[100] flex flex-col items-center justify-center fade-in">
+  <div id="global-loading" class="fixed inset-0 bg-white/90 z-[100] flex flex-col items-center justify-center fade-in" role="status" aria-live="polite">
     <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mb-4"></div>
-    <div class="text-primary font-bold text-sm tracking-widest">LOADING...</div>
+    <div id="global-loading-text" class="text-primary font-bold text-sm tracking-widest">読み込んでいます</div>
+    <button id="global-loading-cancel" onclick="API.cancelAnalysis()" class="hidden mt-5 px-5 py-2.5 rounded-full border border-border bg-white text-sm font-bold text-main">キャンセル</button>
   </div>
 
-  <div id="toast" class="fixed padding-safe-toast left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg whitespace-nowrap"></div>
+  <div id="toast" class="fixed padding-safe-toast left-1/2 -translate-x-1/2 bg-gray-800 text-white px-5 py-3 rounded-2xl text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg max-w-[calc(100vw-32px)] text-center" role="status" aria-live="polite"></div>
 
   <main id="app-content" class="app-shell w-full min-h-screen px-4 sm:px-6 pt-5 sm:pt-8 padding-safe-nav hidden fade-in"></main>
 
-  <div id="modal-overlay" class="fixed inset-0 bg-black/30 z-40 hidden transition-opacity opacity-0" onclick="App.closeModal()"></div>
-  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-card rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] max-h-[85vh] flex flex-col max-w-full overflow-x-hidden box-border">
+  <div id="modal-overlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-[2px] z-40 hidden transition-opacity opacity-0" onclick="App.closeModal()"></div>
+  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-card rounded-t-[32px] shadow-[0_-18px_60px_rgba(15,23,42,0.16)] max-h-[88vh] flex flex-col max-w-[760px] mx-auto overflow-x-hidden box-border" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true" inert>
+    <div class="w-10 h-1 rounded-full bg-slate-200 mx-auto mt-3 shrink-0" aria-hidden="true"></div>
     <div class="sticky top-0 bg-card/95 backdrop-blur z-10 px-6 py-4 flex justify-between items-center border-b border-border/50 shrink-0">
       <h3 id="modal-title" class="text-lg font-bold">タイトル</h3>
-      <button onclick="App.closeModal()" class="text-sub p-2 -mr-2 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
+      <button onclick="App.closeModal()" class="text-sub p-2 -mr-2 bg-gray-100 rounded-full w-11 h-11 flex items-center justify-center font-bold" aria-label="閉じる">✕</button>
     </div>
-    <div id="modal-body" class="p-6 flex-1 overflow-y-auto no-scrollbar padding-safe-modal bg-bg"></div>
+    <div id="modal-body" class="p-5 sm:p-6 flex-1 overflow-y-auto no-scrollbar padding-safe-modal bg-slate-50/80"></div>
   </div>
 
-  <nav class="nav-shell fixed bottom-0 inset-x-0 bg-white/86 backdrop-blur-xl border-t border-border z-30" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+  <nav class="nav-shell fixed bottom-0 inset-x-0 bg-white/86 backdrop-blur-xl border-t border-border z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
     <div class="flex justify-around items-center h-[76px] px-2.5 gap-1.5" id="nav-container">
-      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="home"><span class="text-xl mb-0.5">🏠</span>ホーム</button>
-      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="calendar"><span class="text-xl mb-0.5">📅</span>予定</button>
-      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="records"><span class="text-xl mb-0.5">✏️</span>記録</button>
-      <button onclick="App.navigate('cycles')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="cycles"><span class="text-xl mb-0.5">🔄</span>周期</button>
-      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="settings"><span class="text-xl mb-0.5">⚙️</span>設定</button>
+      <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="home" aria-label="ホーム"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></svg>ホーム</button>
+      <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="calendar" aria-label="予定"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>予定</button>
+      <button onclick="App.navigate('records')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="records" aria-label="記録"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 19h14M7 16l1-4 8-8 3 3-8 8-4 1Z"/></svg>記録</button>
+      <button onclick="App.navigate('cycles')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="cycles" aria-label="周期"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7h-5V2M4 17h5v5m10-8a7 7 0 0 1-12 4l-3-3m1-5A7 7 0 0 1 17 6l3 3"/></svg>周期</button>
+      <button onclick="App.navigate('settings')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] text-sub transition-all duration-200" data-target="settings" aria-label="設定"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-3.5 2-1-2-3-2.2.5a8 8 0 0 0-1.3-.8L15 4h-6l-.5 2.7a8 8 0 0 0-1.3.8L5 7 3 10l2 1a8 8 0 0 0 0 2l-2 1 2 3 2.2-.5a8 8 0 0 0 1.3.8L9 20h6l.5-2.7a8 8 0 0 0 1.3-.8l2.2.5 2-3-2-1a8 8 0 0 0 0-2Z"/></svg>設定</button>
     </div>
   </nav>
 
@@ -350,37 +467,43 @@
     const Utils = {
       toLocalYYYYMMDD: (dateInput) => {
         if (!dateInput) return '';
+        if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return dateInput;
         const d = new Date(dateInput);
         if (isNaN(d)) return '';
         return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' }).format(d).replace(/\//g, '-');
       },
       getTodayStr: () => Utils.toLocalYYYYMMDD(new Date()),
       addDays: (dateStr, days) => {
-        const d = new Date(dateStr);
+        const ymd = Utils.toLocalYYYYMMDD(dateStr);
+        const d = new Date(`${ymd}T00:00:00+09:00`);
         if (isNaN(d)) return null;
-        d.setDate(d.getDate() + days);
-        return d;
+        return new Date(d.getTime() + Number(days) * 86400000);
       },
-      formatMMDD: (d) => {
-        if (!d || isNaN(d)) return '-';
-        return `${d.getMonth() + 1}/${d.getDate()}`;
+      formatMMDD: (dateInput) => {
+        const ymd = Utils.toLocalYYYYMMDD(dateInput);
+        if (!ymd) return '-';
+        const [, month, day] = ymd.split('-');
+        return `${Number(month)}/${Number(day)}`;
       },
       generateId: () => 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36),
+      escapeHtml: (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[char])),
       showToast: (msg, isError = false) => {
         const t = document.getElementById('toast');
+        clearTimeout(Utils.toastTimer);
         t.innerText = msg;
-        t.className = `fixed padding-safe-toast left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-medium z-[110] transition-opacity duration-300 shadow-lg ${isError ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'} opacity-100`;
-        setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 3000);
+        t.className = `fixed padding-safe-toast left-1/2 -translate-x-1/2 px-5 py-3 rounded-2xl text-sm font-medium z-[110] transition-opacity duration-300 shadow-lg max-w-[calc(100vw-32px)] text-center ${isError ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'} opacity-100`;
+        Utils.toastTimer = setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 3000);
       },
       getCalendarUrl: (title, dateStr) => {
-        const start = new Date(dateStr);
+        const start = Utils.toLocalYYYYMMDD(dateStr);
         const end = Utils.addDays(dateStr, 1);
-        const format = (d) => {
-          const yyyy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          return `${yyyy}${mm}${dd}`;
-        };
+        const format = (d) => Utils.toLocalYYYYMMDD(d).replace(/-/g, '');
         const dates = `${format(start)}/${format(end)}`;
         return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dates}`;
       }
@@ -450,6 +573,14 @@
     };
 
     const API = {
+      analysisController: null,
+
+      cancelAnalysis() {
+        if (!this.analysisController) return;
+        this.analysisController.userCancelled = true;
+        this.analysisController.abort();
+      },
+
       async save(table, payloadData) {
         if (!window.FirebaseSync?.user) {
           Utils.showToast('Googleログイン後に保存できます', true);
@@ -464,8 +595,12 @@
         }
 
         const incomingId = typeof payloadData.id === 'string' ? payloadData.id.trim() : payloadData.id;
-        const isUpdate = !!incomingId;
-        const recordId = incomingId || Utils.generateId();
+        const existingDaily = table === 'daily_records' && !incomingId
+          ? Store.get().daily.find(record => Utils.toLocalYYYYMMDD(record.date) === payloadData.date)
+          : null;
+        const recordId = incomingId
+          || existingDaily?.id
+          || (table === 'daily_records' && payloadData.date ? `daily-${payloadData.date}` : Utils.generateId());
         
         let cycleId = undefined;
         if (table !== 'cycles') {
@@ -498,33 +633,25 @@
           Object.entries(payload).filter(([, value]) => value !== undefined)
         );
         if(table === 'daily_records' && !localData.lh_result) localData.lh_result = '';
-        
-        const s = Store.get();
-        let targetArrayKey = table === 'daily_records' ? 'daily' : table === 'clinic_visits' ? 'clinic' : table === 'iui_events' ? 'iui' : table === 'ai_predictions' ? 'aiPredictions' : 'cycles';
-        let newArray = [...s[targetArrayKey]];
-        
-        if (isUpdate) {
-          const idx = newArray.findIndex(item => item.id === recordId);
-          if(idx !== -1) newArray[idx] = localData;
-        } else {
-          newArray.push(localData);
-        }
-        
-        if (table === 'cycles') {
-          newArray.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-        }
+        const formId = document.getElementById('form-id');
+        if (formId && !formId.value) formId.value = recordId;
         
         try {
           await window.FirebaseSync?.save(table, localData);
-          Store.set({ [targetArrayKey]: newArray });
-          if(table === 'cycles') Store.set({ activeCycle: newArray[newArray.length - 1] });
-          App.closeModal();
+          if (table !== 'ai_predictions') App.closeModal(true);
           if (table !== 'ai_predictions') {
              Utils.showToast('保存しました');
           }
         } catch(e) {
           console.warn('Firestore save error:', e);
-          if (table !== 'ai_predictions') Utils.showToast('保存できませんでした', true);
+          if (table !== 'ai_predictions') {
+            const message = e.message === 'OFFLINE'
+              ? 'オフラインです。接続を確認して再試行してください'
+              : e.message === 'WRITE_TIMEOUT'
+                ? '保存確認に時間がかかっています。接続後に再試行してください'
+                : '保存できませんでした';
+            Utils.showToast(message, true);
+          }
           return false;
         }
         
@@ -563,7 +690,27 @@
           
         if (cycleDaily.length < 5) return Utils.showToast('予測にはもう少し体温データが必要です（5日分以上）', true);
 
-        document.getElementById('global-loading').classList.remove('hidden');
+        const loading = document.getElementById('global-loading');
+        const loadingText = document.getElementById('global-loading-text');
+        const cancelButton = document.getElementById('global-loading-cancel');
+        if (this.analysisController) return;
+        const analysisController = new AbortController();
+        this.analysisController = analysisController;
+        const analysisTimeout = setTimeout(() => analysisController.abort(), 30000);
+        const waitForRetry = (delay) => new Promise((resolve, reject) => {
+          const onAbort = () => {
+            clearTimeout(timer);
+            reject(new DOMException('Aborted', 'AbortError'));
+          };
+          const timer = setTimeout(() => {
+            analysisController.signal.removeEventListener('abort', onAbort);
+            resolve();
+          }, delay);
+          analysisController.signal.addEventListener('abort', onAbort, { once: true });
+        });
+        loadingText.innerText = 'AIがデータを分析しています';
+        cancelButton.classList.remove('hidden');
+        loading.classList.remove('hidden');
         
         const dataText = cycleDaily.map(d => {
             let txt = `${Utils.toLocalYYYYMMDD(d.date)}: ${d.temperature}度`;
@@ -676,7 +823,7 @@ ${pastDataText}
 
         try {
           const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-          const modelsRes = await fetch(modelsUrl);
+          const modelsRes = await fetch(modelsUrl, { signal: analysisController.signal });
           const modelsData = await modelsRes.json();
           
           if (modelsData.error) {
@@ -700,7 +847,7 @@ ${pastDataText}
           const targetModelName = bestModel.name.replace('models/', '');
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${apiKey}`;
           
-          const retryDelays = [1000, 2000, 4000, 8000, 16000];
+          const retryDelays = [1000, 2000, 4000];
           let resultText = null;
           let lastError = null;
 
@@ -709,7 +856,8 @@ ${pastDataText}
               const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: analysisController.signal,
               });
               const result = await res.json();
               
@@ -725,10 +873,11 @@ ${pastDataText}
                  throw new Error('AIからデータが返却されませんでした');
               }
             } catch (err) {
+              if (analysisController.signal.aborted) throw err;
               lastError = err;
               console.warn(`AIアクセス試行 ${attempt + 1}回目 失敗:`, err.message);
               if (attempt < retryDelays.length) {
-                await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+                await waitForRetry(retryDelays[attempt]);
               }
             }
           }
@@ -743,7 +892,7 @@ ${pastDataText}
           
           let newAiPredictions = [...Store.get().aiPredictions];
           const existingIdx = newAiPredictions.findIndex(p => p.cycle_id === targetCycleId);
-          const predId = existingIdx !== -1 ? newAiPredictions[existingIdx].id : Utils.generateId();
+          const predId = existingIdx !== -1 ? newAiPredictions[existingIdx].id : `ai-${targetCycleId}`;
           
           const savePayload = {
               id: predId,
@@ -753,14 +902,8 @@ ${pastDataText}
               reason: aiPred.reason || ''
           };
           
-          if (existingIdx !== -1) {
-              newAiPredictions[existingIdx] = savePayload;
-          } else {
-              newAiPredictions.push(savePayload);
-          }
-          Store.set({ aiPredictions: newAiPredictions });
-          
-          await API.save('ai_predictions', savePayload);
+          const saved = await API.save('ai_predictions', savePayload);
+          if (!saved) throw new Error('AI分析結果をFirestoreへ保存できませんでした');
           
           if (activeCycle && targetCycleId === activeCycle.id) {
               Store.set({ aiPrediction: aiPred });
@@ -769,9 +912,17 @@ ${pastDataText}
           
         } catch (e) {
           console.error(e);
-          Utils.showToast(`エラー: ${e.message.substring(0, 45)}...`, true);
+          if (analysisController.signal.aborted) {
+            Utils.showToast(analysisController.userCancelled ? 'AI分析をキャンセルしました' : 'AI分析がタイムアウトしました', true);
+          } else {
+            Utils.showToast(`エラー: ${e.message.substring(0, 45)}...`, true);
+          }
         } finally {
-          document.getElementById('global-loading').classList.add('hidden');
+          clearTimeout(analysisTimeout);
+          if (this.analysisController === analysisController) this.analysisController = null;
+          cancelButton.classList.add('hidden');
+          loadingText.innerText = '読み込んでいます';
+          loading.classList.add('hidden');
         }
       }
     };
@@ -800,9 +951,24 @@ ${pastDataText}
         </div>
       `,
 
+      syncError: () => `
+        <div class="min-h-[70vh] flex items-center justify-center">
+          <div class="w-full max-w-md card-soft rounded-[30px] p-7 text-center">
+            <div class="mx-auto mb-5 w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-2xl">!</div>
+            <p class="text-[10px] font-bold tracking-[0.18em] text-rose-500 mb-2">SYNC ERROR</p>
+            <h1 class="text-xl font-bold text-main mb-3">データを完全に読み込めませんでした</h1>
+            <p class="text-sm text-sub leading-relaxed mb-6">不完全な状態で重複登録しないよう、記録の編集を一時停止しています。通信状態を確認して再試行してください。</p>
+            <button onclick="App.retrySync()" class="btn-primary w-full py-4 rounded-2xl font-bold">同期を再試行</button>
+            <button onclick="App.signOutFromSync()" class="w-full mt-3 py-3 rounded-2xl border border-border bg-white text-sm font-bold text-main">別のアカウントでログイン</button>
+          </div>
+        </div>
+      `,
+
       home: () => {
         const { activeCycle, daily, dashTab, aiPredictions, aiMemos, syncStatus } = Store.get();
         const isSynced = syncStatus === 'synced';
+        const syncLabel = isSynced ? '同期済み' : syncStatus === 'error' ? '同期エラー' : '接続中';
+        const syncDotClass = isSynced ? 'bg-emerald-500' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-amber-400';
         
         const headerHtml = `
           <div class="flex justify-between items-center mb-6">
@@ -811,8 +977,8 @@ ${pastDataText}
               <h1 class="text-3xl font-serif tracking-wider text-main font-bold">Rhythm</h1>
             </div>
             <button onclick="App.navigate('settings')" class="flex items-center gap-2 bg-white/80 border border-border/70 px-3 py-2 rounded-full shadow-sm active:scale-[0.98] transition-transform">
-              <span class="w-2 h-2 rounded-full ${isSynced ? 'bg-emerald-500' : 'bg-slate-300'}"></span>
-              <span class="text-[11px] font-bold text-main">${isSynced ? '同期中' : '未接続'}</span>
+              <span class="w-2 h-2 rounded-full ${syncDotClass}"></span>
+              <span class="text-[11px] font-bold text-main">${syncLabel}</span>
             </button>
           </div>
         `;
@@ -927,12 +1093,12 @@ ${pastDataText}
                   <div class="bg-white/70 p-3 rounded-xl"><span class="text-[11px] text-slate-500 block mb-1">予測・次生理日</span><span class="font-bold text-rose-500 text-[15px]">${aiPred.next_period_date ? Utils.formatMMDD(new Date(aiPred.next_period_date)) : '-'}</span></div>
                 </div>
                 <div class="mb-4">
-                  <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
+                  <label for="ai-memo-input" class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
+                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${activeCycle.id}', this.value)">${Utils.escapeHtml(savedAiMemo)}</textarea>
                 </div>
                 <div class="text-[12px] text-slate-700 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-blue-100/50">
                   <span class="font-bold mb-1 block text-slate-800">💡 AIからのコメント</span>
-                  ${aiPred.reason}
+                  ${Utils.escapeHtml(aiPred.reason)}
                 </div>
               </div>
             </details>
@@ -947,8 +1113,8 @@ ${pastDataText}
               <div class="px-5 pb-5 border-t border-blue-100/50 pt-4 mt-1">
                 <p class="text-[13px] text-slate-800 font-bold mb-4 text-center">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
                 <div class="mb-4">
-                  <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${activeCycle.id}', this.value)">${savedAiMemo}</textarea>
+                  <label for="ai-memo-input" class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
+                  <textarea id="ai-memo-input" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${activeCycle.id}', this.value)">${Utils.escapeHtml(savedAiMemo)}</textarea>
                 </div>
                 <button onclick="API.analyzeWithAI('${activeCycle.id}')" class="bg-blue-500 text-white w-full py-3.5 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-transform">AIで予測する</button>
               </div>
@@ -962,12 +1128,12 @@ ${pastDataText}
         if (hasTodayDaily) {
           tasks.push(`<div class="flex items-center text-[15px] py-3"><span class="mr-3 text-lg text-teal-500">☑</span><span class="text-sub">今日の体温記録は完了</span></div>`);
         } else {
-          tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50" onclick="App.openModal('daily')"><div class="w-2 h-2 rounded-full bg-primary mr-3"></div><span class="font-medium text-main">基礎体温を記録しましょう <span class="text-gray-300 ml-1">›</span></span></div>`);
+          tasks.push(`<button type="button" class="w-full flex items-center text-left text-[15px] py-3 active:opacity-50" onclick="App.openModal('daily')"><span class="w-2 h-2 rounded-full bg-primary mr-3"></span><span class="font-medium text-main">基礎体温を記録しましょう <span class="text-gray-300 ml-1">›</span></span></button>`);
         }
 
         if (preds.iui && !preds.isIUIDone && !preds.isPredictedIUI && !isRestCycle) {
           if (today === preds.iui) {
-            tasks.push(`<div class="flex items-center text-[15px] py-3 cursor-pointer active:opacity-50 border-t border-border/50" onclick="App.openModal('iui')"><div class="w-2 h-2 rounded-full ${mainBgClass} mr-3"></div><span class="font-medium ${mainTextClass}">本日${eventLabel}予定日です。結果を記録 <span class="text-gray-300 ml-1">›</span></span></div>`);
+            tasks.push(`<button type="button" class="w-full flex items-center text-left text-[15px] py-3 active:opacity-50 border-t border-border/50" onclick="App.openModal('iui')"><span class="w-2 h-2 rounded-full ${mainBgClass} mr-3"></span><span class="font-medium ${mainTextClass}">本日${eventLabel}予定日です。結果を記録 <span class="text-gray-300 ml-1">›</span></span></button>`);
           } else if (today < preds.iui && preds.abstain && today >= preds.abstain) {
              tasks.push(`<div class="flex items-center text-[15px] py-3 border-t border-border/50"><div class="w-2 h-2 rounded-full ${preBgClass} mr-3"></div><span class="font-medium ${preTextClass}">${preLabel}です (${Utils.formatMMDD(new Date(preds.iui))}予定)</span></div>`);
           }
@@ -1020,20 +1186,18 @@ ${pastDataText}
           </div>
           <h2 class="text-sm font-bold text-main mb-3 ml-1">クイック記録</h2>
           <div class="grid grid-cols-2 gap-3 mb-8">
-            <button onclick="App.openModal('daily')" class="card-soft rounded-[22px] p-4 text-left active:scale-[0.98] transition-transform">
-              <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl mb-3">🌡</div>
-              <div class="text-[13px] font-bold text-main">基礎体温</div>
-              <div class="text-[11px] text-sub mt-1">今日の体温</div>
+            <button onclick="App.openModal('daily')" class="card-soft col-span-2 rounded-[22px] p-4 flex items-center gap-4 text-left active:scale-[0.99] transition-transform">
+              <div class="w-12 h-12 shrink-0 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl">🌡</div>
+              <div class="flex-1">
+                <div class="text-[14px] font-bold text-main">今日の基礎体温</div>
+                <div class="text-[11px] text-sub mt-1">${hasTodayDaily ? '記録済み・タップして編集' : '数秒で記録できます'}</div>
+              </div>
+              <span class="text-slate-300 text-xl">›</span>
             </button>
             <button onclick="App.openModal('clinic')" class="card-soft rounded-[22px] p-4 text-left active:scale-[0.98] transition-transform">
               <div class="w-10 h-10 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center text-xl mb-3">🏥</div>
               <div class="text-[13px] font-bold text-main">通院記録</div>
               <div class="text-[11px] text-sub mt-1">診察・次回予定</div>
-            </button>
-            <button onclick="App.openModal('meds')" class="card-soft rounded-[22px] p-4 text-left active:scale-[0.98] transition-transform">
-              <div class="w-10 h-10 rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center text-xl mb-3">💊</div>
-              <div class="text-[13px] font-bold text-main">薬・注射</div>
-              <div class="text-[11px] text-sub mt-1">準備中</div>
             </button>
             <button onclick="App.openModal('iui')" class="card-soft rounded-[22px] p-4 text-left active:scale-[0.98] transition-transform">
               <div class="w-10 h-10 rounded-2xl ${isTiming ? 'bg-pink-50 text-pink-500' : 'bg-blue-50 text-blue-500'} flex items-center justify-center text-xl mb-3">${mainIcon}</div>
@@ -1068,7 +1232,7 @@ ${pastDataText}
         let cells = '';
         for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
         for (let i = 1; i <= lastDay; i++) {
-          const dStr = Utils.toLocalYYYYMMDD(new Date(year, month, i));
+          const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
           const isToday = dStr === todayStr;
           const hasRec = recordDates.has(dStr);
           const isPeriod = periodDates.has(dStr);
@@ -1080,20 +1244,41 @@ ${pastDataText}
           const preIcon = isTimingEv ? '💓' : '❌';
           
           let eventsHtml = '';
-          if (iuiDates.includes(dStr)) eventsHtml += `<span class="text-[10px]">${mainIcon}</span>`;
-          else if (dStr === preds.iui && !preds.isPredictedIUI) eventsHtml += `<span class="text-[10px]">${mainIcon}</span>`;
-          else if (dStr === preds.iui && preds.isPredictedIUI) eventsHtml += `<span class="text-[10px] opacity-40">${mainIcon}</span>`;
-          else if (futureIuis.includes(dStr)) eventsHtml += `<span class="text-[10px] opacity-40">${mainIcon}</span>`;
+          const eventNames = [];
+          if (iuiDates.includes(dStr)) {
+            eventsHtml += `<span class="text-[10px]">${mainIcon}</span>`;
+            eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}実施日`);
+          } else if (dStr === preds.iui && !preds.isPredictedIUI) {
+            eventsHtml += `<span class="text-[10px]">${mainIcon}</span>`;
+            eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}予定日`);
+          } else if (dStr === preds.iui && preds.isPredictedIUI) {
+            eventsHtml += `<span class="text-[10px] opacity-40">${mainIcon}</span>`;
+            eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}予測日`);
+          } else if (futureIuis.includes(dStr)) {
+            eventsHtml += `<span class="text-[10px] opacity-40">${mainIcon}</span>`;
+            eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}予測日`);
+          }
           
-          if (cycleStarts.includes(dStr)) eventsHtml += '<span class="text-[10px]">🩸</span>';
-          else if (dStr === preds.period) eventsHtml += `<span class="text-[10px]">${preds.isAIPeriod ? '✨' : '🩸'}</span>`;
-          else if (futurePeriods.includes(dStr)) eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
+          if (cycleStarts.includes(dStr)) {
+            eventsHtml += '<span class="text-[10px]">🩸</span>';
+            eventNames.push('生理開始日');
+          } else if (dStr === preds.period) {
+            eventsHtml += `<span class="text-[10px]">${preds.isAIPeriod ? '✨' : '🩸'}</span>`;
+            eventNames.push(preds.isAIPeriod ? 'AIによる次回生理予測日' : '次回生理予定日');
+          } else if (futurePeriods.includes(dStr)) {
+            eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
+            eventNames.push('生理予測日');
+          }
           
           if (aiOvulationDates.includes(dStr)) {
-             eventsHtml += '<span class="text-[10px]">🥚</span>'; 
+             eventsHtml += '<span class="text-[10px]">🥚</span>';
+             eventNames.push('AIによる排卵予測日');
           }
 
-          if (isAbstain) eventsHtml += `<span class="text-[10px]">${preIcon}</span>`;
+          if (isAbstain) {
+            eventsHtml += `<span class="text-[10px]">${preIcon}</span>`;
+            eventNames.push(isTimingEv ? 'タイミング推奨期間' : '禁欲期間');
+          }
 
           const isIUI = iuiDates.includes(dStr) || (dStr === preds.iui && !preds.isPredictedIUI);
 
@@ -1108,38 +1293,49 @@ ${pastDataText}
           const borderClass = isToday ? 'border border-primary' : '';
           const textClass = isToday ? 'text-primary font-bold' : '';
 
+          const accessibleEvents = eventNames.length ? eventNames.join('、') : '予定なし';
           cells += `
-            <div class="aspect-square flex flex-col items-center pt-1 rounded-xl relative cursor-pointer active:bg-gray-100 transition-colors ${bgClass} ${borderClass}" 
-                 onclick="App.selectDate('${dStr}')" id="cal-cell-${dStr}">
+            <button type="button" class="aspect-square flex flex-col items-center pt-1 rounded-xl relative active:bg-gray-100 transition-colors ${bgClass} ${borderClass}"
+                 onclick="App.selectDate('${dStr}')" id="cal-cell-${dStr}" aria-pressed="false" aria-label="${month + 1}月${i}日、${accessibleEvents}${hasRec ? '、記録あり' : ''}">
               <span class="text-[14px] ${textClass} leading-none mb-0.5">${i}</span>
               <div class="flex flex-wrap justify-center gap-[1px] leading-none px-0.5">${eventsHtml}</div>
               ${hasRec ? `<div class="w-1 h-1 bg-primary rounded-full absolute bottom-1"></div>` : ''}
-            </div>
+            </button>
           `;
         }
 
         return `
-          <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider text-main text-center">カレンダー</h1></div>
+          <div class="mb-6">
+            <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">SCHEDULE</p>
+            <h1 class="text-3xl font-serif tracking-wider text-main font-bold">予定</h1>
+            <p class="text-xs text-sub mt-2">予測と記録を日付ごとに確認できます</p>
+          </div>
           <div class="card-soft rounded-[28px] p-5">
             <div class="flex justify-between items-center mb-4 px-2">
-              <button onclick="App.changeMonth(-1)" class="p-2 text-xl text-sub hover:text-main transition-colors">‹</button>
+              <button onclick="App.changeMonth(-1)" class="w-11 h-11 rounded-full flex items-center justify-center text-xl text-sub hover:text-main hover:bg-slate-100 transition-colors" aria-label="前の月">‹</button>
               <div class="flex items-center gap-3">
                 <div class="font-bold text-lg">${year}年${month + 1}月</div>
                 <button onclick="App.goToday()" class="text-[11px] bg-slate-100 text-main px-2.5 py-1 rounded shadow-sm active:bg-slate-200 font-bold transition-colors">今日</button>
               </div>
-              <button onclick="App.changeMonth(1)" class="p-2 text-xl text-sub hover:text-main transition-colors">›</button>
+              <button onclick="App.changeMonth(1)" class="w-11 h-11 rounded-full flex items-center justify-center text-xl text-sub hover:text-main hover:bg-slate-100 transition-colors" aria-label="次の月">›</button>
+            </div>
+            <div class="flex flex-wrap gap-x-3 gap-y-1.5 mb-4 px-2 text-[10px] text-sub" aria-label="カレンダーの凡例">
+              <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary"></span>記録あり</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-rose-100 border border-rose-200"></span>生理</span>
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-100 border border-blue-200"></span>IUI・タイミング</span>
+              <span class="flex items-center gap-1.5"><span class="opacity-50 font-bold">予</span>予測</span>
             </div>
             <div class="grid grid-cols-7 text-center mb-2 text-xs font-bold text-sub">
               <div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
             </div>
             <div class="grid grid-cols-7 text-center gap-1">${cells}</div>
           </div>
-          <div id="cal-detail-area" class="mt-6"><p class="text-center text-sub text-sm mt-10">日付をタップして記録を確認</p></div>
+          <div id="cal-detail-area" class="mt-6" aria-live="polite"><p class="text-center text-sub text-sm mt-10">日付をタップして記録を確認</p></div>
         `;
       },
 
       records: () => {
-        const { daily, clinic, cycles, selectedCycleId, activeCycle, aiPredictions, aiMemos } = Store.get();
+        const { daily, clinic, iui, cycles, selectedCycleId, activeCycle, aiPredictions, aiMemos } = Store.get();
         const targetCycleId = selectedCycleId || (activeCycle ? activeCycle.id : null);
         const targetCycle = cycles.find(c => c.id === targetCycleId);
         const baseTemp = Store.get().settings.baseTemp || 36.70;
@@ -1158,7 +1354,8 @@ ${pastDataText}
           
           cycleSelectorHtml = `
             <div class="mb-5">
-              <select class="form-control w-full bg-white border border-border rounded-xl px-4 py-3 text-[14px] outline-none font-bold shadow-sm" onchange="App.changeRecordsCycle(this.value)">
+              <label for="records-cycle" class="field-label">表示する周期</label>
+              <select id="records-cycle" class="form-control w-full bg-white border border-border rounded-xl px-4 py-3 text-[14px] outline-none font-bold shadow-sm" onchange="App.changeRecordsCycle(this.value)">
                 ${options}
               </select>
             </div>
@@ -1180,28 +1377,65 @@ ${pastDataText}
         const cycleDaily = daily.filter(d => {
           const dStr = Utils.toLocalYYYYMMDD(d.date);
           return dStr >= startDateStr && dStr < endDateStr;
-        });
+        }).sort((a, b) => new Date(a.date) - new Date(b.date));
         const cycleClinic = clinic.filter(c => {
           const dStr = Utils.toLocalYYYYMMDD(c.visit_date);
           return dStr >= startDateStr && dStr < endDateStr;
         });
+        const cycleIui = iui.filter(event => {
+          const dStr = Utils.toLocalYYYYMMDD(event.actual_date || event.planned_date);
+          return dStr >= startDateStr && dStr < endDateStr;
+        });
+        const temperatureRows = cycleDaily
+          .map(record => ({ date: Utils.toLocalYYYYMMDD(record.date), value: Number(record.temperature) }))
+          .filter(record => record.date && Number.isFinite(record.value));
+        const latestTemperature = temperatureRows[temperatureRows.length - 1];
+        const minTemperature = temperatureRows.length ? Math.min(...temperatureRows.map(record => record.value)) : null;
+        const maxTemperature = temperatureRows.length ? Math.max(...temperatureRows.map(record => record.value)) : null;
+        const temperatureSummaryHtml = latestTemperature ? `
+          <div class="grid grid-cols-3 gap-2 mt-4" aria-label="基礎体温の要約">
+            <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] text-sub mb-1">直近</div><div class="text-sm font-bold">${latestTemperature.value.toFixed(2)}℃</div></div>
+            <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] text-sub mb-1">最低</div><div class="text-sm font-bold">${minTemperature.toFixed(2)}℃</div></div>
+            <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] text-sub mb-1">最高</div><div class="text-sm font-bold">${maxTemperature.toFixed(2)}℃</div></div>
+          </div>
+          <details class="mt-3">
+            <summary class="text-[11px] font-bold text-sub cursor-pointer py-2">日付ごとの数値を見る</summary>
+            <div class="max-h-48 overflow-y-auto rounded-xl border border-border bg-white">
+              <table class="w-full text-[12px]">
+                <thead class="sticky top-0 bg-slate-50 text-sub"><tr><th class="text-left px-3 py-2">日付</th><th class="text-right px-3 py-2">体温</th></tr></thead>
+                <tbody>${[...temperatureRows].reverse().map(record => `<tr class="border-t border-border/60"><td class="px-3 py-2">${record.date.replace(/-/g, '/')}</td><td class="px-3 py-2 text-right font-bold">${record.value.toFixed(2)}℃</td></tr>`).join('')}</tbody>
+              </table>
+            </div>
+          </details>
+        ` : '';
 
-        const all = [...cycleDaily.map(d => ({...d, type: 'daily'})), ...cycleClinic.map(c => ({...c, type: 'clinic', date: c.visit_date}))];
+        const all = [
+          ...cycleDaily.map(d => ({...d, type: 'daily'})),
+          ...cycleClinic.map(c => ({...c, type: 'clinic', date: c.visit_date})),
+          ...cycleIui.map(event => ({...event, type: 'iui', date: event.actual_date || event.planned_date})),
+        ];
         all.sort((a, b) => new Date(b.date) - new Date(a.date));
         
-        let listHtml = all.map(r => `
-          <div class="card-soft rounded-[20px] p-4 mb-3 flex justify-between items-center active:scale-[0.99] transition-transform cursor-pointer"
+        let listHtml = all.map(r => {
+          const detail = r.type === 'daily'
+            ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C`
+            : r.type === 'clinic'
+              ? '🏥 通院記録'
+              : `${isTiming ? '💕' : '📌'} ${eventLabel}${r.actual_date ? '実施済み' : '予定'}`;
+          return `
+          <button type="button" class="card-soft w-full rounded-[20px] p-4 mb-3 flex justify-between items-center text-left active:scale-[0.99] transition-transform"
                onclick="App.openModal('${r.type}', '${r.id}')">
             <div>
               <div class="font-bold text-[15px] mb-1 text-main flex items-center gap-1">
                 ${Utils.toLocalYYYYMMDD(r.date)}
                 ${r.memo ? '<span class="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded ml-1 font-bold">メモあり</span>' : ''}
               </div>
-              <div class="text-[13px] text-sub">${r.type === 'daily' ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C` : '🏥 通院記録あり'}</div>
+              <div class="text-[13px] text-sub">${detail}</div>
             </div>
             <div class="text-slate-300 text-xl">›</div>
-          </div>
-        `).join('');
+          </button>
+        `;
+        }).join('');
         
         if(!listHtml) listHtml = '<p class="text-center text-sub mt-10 text-sm">記録がありません</p>';
 
@@ -1225,12 +1459,12 @@ ${pastDataText}
                   <div class="bg-white/70 p-3 rounded-xl"><span class="text-[11px] text-slate-500 block mb-1">予測・次生理日</span><span class="font-bold text-rose-500 text-[15px]">${targetAiPred.next_period_date ? Utils.formatMMDD(new Date(targetAiPred.next_period_date)) : '-'}</span></div>
                 </div>
                 <div class="mb-4">
-                  <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${savedAiMemo}</textarea>
+                  <label for="ai-memo-input-record" class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
+                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${Utils.escapeHtml(savedAiMemo)}</textarea>
                 </div>
                 <div class="text-[12px] text-slate-700 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-blue-100/50">
                   <span class="font-bold mb-1 block text-slate-800">💡 AIからのコメント</span>
-                  ${targetAiPred.reason}
+                  ${Utils.escapeHtml(targetAiPred.reason)}
                 </div>
               </div>
             </details>
@@ -1245,8 +1479,8 @@ ${pastDataText}
               <div class="px-5 pb-5 border-t border-blue-100/50 pt-4 mt-1">
                 <p class="text-[13px] text-slate-800 font-bold mb-4 text-center">基礎体温データから排卵日と<br>次の生理予定日を分析します</p>
                 <div class="mb-4 text-left">
-                  <label class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
-                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${savedAiMemo}</textarea>
+                  <label for="ai-memo-input-record" class="block text-[11px] font-bold mb-1 text-slate-600">AIへの補足メモ（任意）</label>
+                  <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${Utils.escapeHtml(savedAiMemo)}</textarea>
                 </div>
                 <button onclick="API.analyzeWithAI('${targetCycleId}')" class="bg-blue-500 text-white w-full py-3.5 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-transform">AIで予測する</button>
               </div>
@@ -1255,7 +1489,11 @@ ${pastDataText}
         }
 
         return `
-          <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">記録一覧</h1></div>
+          <div class="mb-6">
+            <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">RECORDS</p>
+            <h1 class="text-3xl font-serif tracking-wider text-main font-bold">記録</h1>
+            <p class="text-xs text-sub mt-2">体温の変化と通院履歴を周期ごとに確認</p>
+          </div>
           
           ${cycleSelectorHtml}
 
@@ -1271,9 +1509,10 @@ ${pastDataText}
             </div>
             
             <div class="w-full h-[200px] relative flex justify-center items-center">
-              <canvas id="tempChart" class="z-10 absolute inset-0"></canvas>
+              <canvas id="tempChart" class="z-10 absolute inset-0" role="img" aria-label="選択中の周期の基礎体温グラフ"></canvas>
               <div id="tempChart-empty" class="text-sub text-xs hidden z-0">体温データがありません</div>
             </div>
+            ${temperatureSummaryHtml}
           </div>
           
           ${aiHtml}
@@ -1294,7 +1533,7 @@ ${pastDataText}
           const statusColor = c.status === '進行中' ? 'bg-primary-light text-primary' : 'bg-slate-100 text-sub';
 
           return `
-            <div class="card-soft rounded-[20px] p-4 mb-3 flex justify-between items-center active:scale-[0.99] transition-transform cursor-pointer"
+            <button type="button" class="card-soft w-full rounded-[20px] p-4 mb-3 flex justify-between items-center text-left active:scale-[0.99] transition-transform"
                  onclick="App.openModal('new-cycle', '${c.id}')">
               <div class="flex-1">
                 <div class="flex gap-2 items-center mb-2">
@@ -1307,15 +1546,19 @@ ${pastDataText}
                 <div class="text-[20px] font-bold text-main">${diffDays}<span class="text-[12px] font-normal text-sub ml-1">日間</span></div>
               </div>
               <div class="text-slate-300 text-xl ml-3">›</div>
-            </div>
+            </button>
           `;
         }).join('');
         
         if(!listHtml) listHtml = '<p class="text-center text-sub mt-10 text-sm">周期データがありません</p>';
         return `
-          <div class="mt-4 mb-6 flex justify-between items-center">
-            <h1 class="text-2xl font-serif tracking-wider">周期一覧</h1>
-            <button onclick="App.openModal('new-cycle')" class="bg-primary text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-sm">＋ 新規</button>
+          <div class="mb-6 flex justify-between items-end gap-4">
+            <div>
+              <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">CYCLES</p>
+              <h1 class="text-3xl font-serif tracking-wider text-main font-bold">周期</h1>
+              <p class="text-xs text-sub mt-2">これまでの周期を確認・編集</p>
+            </div>
+            <button onclick="App.openModal('new-cycle')" class="btn-primary shrink-0 px-4 py-2.5 rounded-full text-sm font-bold">＋ 新規</button>
           </div>
           <div>${listHtml}</div>
         `;
@@ -1326,8 +1569,10 @@ ${pastDataText}
         const stats = App.getCycleStats();
         const syncLabel = syncStatus === 'synced' ? 'ログイン中' : syncStatus === 'syncing' ? '接続中' : syncStatus === 'error' ? '接続エラー' : '未ログイン';
         const syncDotClass = syncStatus === 'synced' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-amber-400' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-slate-300';
-        const syncButtonHtml = syncStatus === 'signed-out' || syncStatus === 'error'
-          ? `<button onclick="App.signInToSync()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-sm active:scale-[0.98] transition-transform">Googleで同期を始める</button>`
+        const syncButtonHtml = syncStatus === 'signed-out'
+          ? `<button onclick="App.signInToSync()" class="btn-primary w-full font-bold py-3.5 rounded-xl">Googleで同期を始める</button>`
+          : syncStatus === 'error'
+            ? `<button onclick="App.retrySync()" class="btn-primary w-full font-bold py-3.5 rounded-xl">同期を再試行</button>`
           : `<button onclick="App.signOutFromSync()" class="w-full bg-white border border-border text-main font-bold py-3.5 rounded-xl active:bg-slate-50 transition-colors">ログアウト</button>`;
         
         const statHtml = stats.count > 0 
@@ -1339,12 +1584,16 @@ ${pastDataText}
           : `<p class="text-[10px] text-sub mt-2">※過去の周期データが蓄積されると算出されます</p>`;
 
         return `
-          <div class="mt-4 mb-6"><h1 class="text-2xl font-serif tracking-wider">設定</h1></div>
+          <div class="mb-6">
+            <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">SETTINGS</p>
+            <h1 class="text-3xl font-serif tracking-wider text-main font-bold">設定</h1>
+            <p class="text-xs text-sub mt-2">予測条件とクラウド同期を管理</p>
+          </div>
           
           <h2 class="text-sm font-bold text-main mb-3 ml-1">周期設定</h2>
           <div class="card-soft rounded-[28px] p-5 mb-6">
             <div class="mb-5">
-              <label class="block text-[13px] text-main mb-2">平均周期日数</label>
+              <label for="set-cycle-len" class="block text-[13px] text-main mb-2">平均周期日数</label>
               <div class="flex items-center gap-2">
                 <input type="number" id="set-cycle-len" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none font-bold" value="${settings.cycleLen}" onchange="App.updateSettings('cycleLen', this.value)">
                 <span class="text-sm font-bold text-sub">日</span>
@@ -1353,7 +1602,7 @@ ${pastDataText}
             </div>
             <hr class="border-border/50 mb-5">
             <div>
-              <label class="block text-[13px] text-main mb-2">事前アクション日数 (禁欲 / タイミング推奨)</label>
+              <label for="set-abstinence" class="block text-[13px] text-main mb-2">事前アクション日数 (禁欲 / タイミング推奨)</label>
               <select id="set-abstinence" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('abstainDays', this.value)">
                 <option value="1" ${settings.abstainDays==1?'selected':''}>1日</option><option value="2" ${settings.abstainDays==2?'selected':''}>2日</option><option value="3" ${settings.abstainDays==3?'selected':''}>3日</option><option value="4" ${settings.abstainDays==4?'selected':''}>4日</option><option value="5" ${settings.abstainDays==5?'selected':''}>5日</option>
               </select>
@@ -1361,14 +1610,14 @@ ${pastDataText}
             </div>
             <hr class="border-border/50 my-5">
             <div>
-              <label class="block text-[13px] text-main mb-2">生理期間 (カレンダー表示用)</label>
+              <label for="set-period-days" class="block text-[13px] text-main mb-2">生理期間 (カレンダー表示用)</label>
               <select id="set-period-days" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[15px] outline-none font-bold" onchange="App.updateSettings('periodDays', this.value)">
                 <option value="3" ${settings.periodDays==3?'selected':''}>3日間</option><option value="4" ${settings.periodDays==4?'selected':''}>4日間</option><option value="5" ${settings.periodDays==5?'selected':''}>5日間</option><option value="6" ${settings.periodDays==6?'selected':''}>6日間</option><option value="7" ${settings.periodDays==7?'selected':''}>7日間</option>
               </select>
             </div>
             <hr class="border-border/50 my-5">
             <div>
-              <label class="block text-[13px] text-main mb-2">グラフの基準線 (°C)</label>
+              <label for="set-base-temp" class="block text-[13px] text-main mb-2">グラフの基準線 (°C)</label>
               <div class="flex items-center gap-2">
                 <input type="number" id="set-base-temp" step="0.01" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none font-bold" value="${Number(settings.baseTemp).toFixed(2)}" onchange="App.updateSettings('baseTemp', this.value)">
                 <span class="text-sm font-bold text-sub">℃</span>
@@ -1382,9 +1631,11 @@ ${pastDataText}
           <h2 class="text-sm font-bold text-slate-800 mb-3 ml-1 mt-8 flex items-center gap-1"><span class="text-lg leading-none">✨</span> AI設定</h2>
           <div class="bg-gradient-to-br from-slate-100 to-blue-50 rounded-[20px] p-5 shadow-sm border border-blue-100 mb-6">
             <div>
-              <label class="block text-[13px] text-slate-800 mb-2 font-bold">Gemini APIキー</label>
-              <input type="password" id="set-api-key" class="form-control w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-[15px] outline-none" value="${apiKey}" placeholder="AIzaSy..." onchange="App.updateApiKey(this.value)">
-              <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">※キーはログイン中のFirebaseデータとして保存されます。<br>※基礎体温と過去の実績データから分析を行います。</p>
+              <label for="set-api-key" class="block text-[13px] text-slate-800 mb-2 font-bold">Gemini APIキー</label>
+              <input type="password" id="set-api-key" class="form-control w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-[15px] outline-none" value="${Utils.escapeHtml(apiKey)}" placeholder="AIzaSy..." onchange="App.updateApiKey(this.value)">
+              <div class="mt-3 rounded-xl bg-white/70 border border-blue-100 p-3 text-[10px] text-slate-600 leading-relaxed">
+                分析時に基礎体温、補足メモ、IUI・タイミング日、過去3周期の傾向をGoogle Geminiへ送信します。結果は参考情報であり、診断や医療判断の代わりにはなりません。
+              </div>
             </div>
           </div>
 
@@ -1393,7 +1644,7 @@ ${pastDataText}
             <div class="flex items-center justify-between mb-4">
               <div>
                 <div class="text-[13px] font-bold text-main">Firebaseアカウント</div>
-                <div class="text-[11px] text-sub mt-1">${syncUserEmail || 'Googleログインで複数端末から同じデータを使えます'}</div>
+                <div class="text-[11px] text-sub mt-1">${Utils.escapeHtml(syncUserEmail || 'Googleログインで複数端末から同じデータを使えます')}</div>
               </div>
               <div class="flex items-center gap-2 text-[12px] font-bold text-main">
                 <span class="w-2.5 h-2.5 rounded-full ${syncDotClass}"></span>${syncLabel}
@@ -1413,16 +1664,27 @@ ${pastDataText}
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().daily.find(x => x.id === id) || {};
         return `
-          <div class="mb-4">
-            <label class="block text-[13px] font-bold mb-1 text-main">日付</label>
-            <input type="date" id="form-date" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" onchange="App.checkExistingDaily(this.value)">
+          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+            <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">BASAL TEMPERATURE</p>
+            <p class="text-sm text-main leading-relaxed">日付と体温を入力します。同じ日付の記録がある場合は上書きします。</p>
           </div>
-          <div class="mb-4">
-            <label class="block text-[13px] font-bold mb-1 text-main">基礎体温 (°C)</label>
-            <input type="number" id="form-temp" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" step="0.01" value="${r.temperature || ''}" placeholder="例: 36.50">
+          <div id="form-existing-note" class="${r.id ? '' : 'hidden'} mb-4 rounded-xl bg-sky-50 border border-sky-100 px-3.5 py-3 text-[12px] font-bold text-sky-700">この日の記録を編集中です</div>
+          <div class="mb-5">
+            <label class="field-label" for="form-date">日付 <span class="field-required">必須</span></label>
+            <input type="date" id="form-date" class="form-control px-4 py-3 text-[16px] outline-none" value="${r.date ? Utils.toLocalYYYYMMDD(r.date) : d}" onchange="App.checkExistingDaily(this.value)" required>
+          </div>
+          <div class="mb-5">
+            <label class="field-label" for="form-temp">基礎体温 <span class="field-required">必須</span></label>
+            <div class="relative">
+              <input type="number" id="form-temp" class="form-control px-4 pr-12 py-3 text-[20px] font-bold outline-none" step="0.01" min="34" max="42" inputmode="decimal" autocomplete="off" value="${r.temperature || ''}" placeholder="36.50" required>
+              <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-sub">°C</span>
+            </div>
+            <p class="field-hint">小数点以下2桁まで入力できます（34.00〜42.00°C）</p>
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('daily')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          <input type="hidden" id="form-original-id" value="${r.id || ''}">
+          <div id="form-error" class="form-error hidden mb-4 rounded-xl px-3.5 py-3 text-[12px] font-bold" role="alert"></div>
+          <button id="form-submit" onclick="App.submitForm('daily')" class="btn-primary w-full py-4 rounded-2xl font-bold" data-default-label="${r.id ? '変更を保存' : '記録を保存'}">${r.id ? '変更を保存' : '記録を保存'}</button>
           ${id ? `<button onclick="App.deleteRecord('daily', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この記録を削除</button>` : ''}
         `;
       },
@@ -1430,32 +1692,28 @@ ${pastDataText}
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().clinic.find(x => x.id === id) || {};
         return `
-          <div class="mb-4">
-            <label class="block text-[13px] font-bold mb-1 text-main">受診日</label>
-            <input type="date" id="form-date" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : d}">
+          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+            <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">CLINIC VISIT</p>
+            <p class="text-sm text-main leading-relaxed">受診日と、病院から案内された次回予定を記録します。</p>
           </div>
-          <div class="mb-6">
-            <label class="block text-[13px] font-bold mb-1 text-main">次回受診の指示日</label>
-            <input type="date" id="form-next" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.next_visit_date ? Utils.toLocalYYYYMMDD(r.next_visit_date) : ''}">
+          <div class="mb-5">
+            <label class="field-label" for="form-date">受診日 <span class="field-required">必須</span></label>
+            <input type="date" id="form-date" class="form-control px-4 py-3 text-[16px]" value="${r.visit_date ? Utils.toLocalYYYYMMDD(r.visit_date) : d}" required>
+          </div>
+          <div class="mb-5">
+            <label class="field-label" for="form-next">次回受診日 <span class="text-[10px] font-bold text-sub">任意</span></label>
+            <input type="date" id="form-next" class="form-control px-4 py-3 text-[16px]" value="${r.next_visit_date ? Utils.toLocalYYYYMMDD(r.next_visit_date) : ''}">
+            <p class="field-hint">未定の場合は空欄のまま保存できます</p>
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('clinic')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          <div id="form-error" class="form-error hidden mb-4 rounded-xl px-3.5 py-3 text-[12px] font-bold" role="alert"></div>
+          <button id="form-submit" onclick="App.submitForm('clinic')" class="btn-primary w-full py-4 rounded-2xl font-bold" data-default-label="${r.id ? '変更を保存' : '記録を保存'}">${r.id ? '変更を保存' : '記録を保存'}</button>
           ${id ? `<button onclick="App.deleteRecord('clinic', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この記録を削除</button>` : ''}
         `;
       },
       iui: (id, defaultDate) => {
         const d = defaultDate || Utils.getTodayStr();
-        let r = null;
-        if (id) {
-          r = Store.get().iui.find(x => x.id === id);
-        } else {
-          const { activeCycle, iui } = Store.get();
-          if (activeCycle) {
-            const cycleIui = iui.filter(x => x.cycle_id === activeCycle.id);
-            if (cycleIui.length > 0) r = cycleIui[cycleIui.length - 1];
-          }
-        }
-        r = r || {};
+        const r = (id ? Store.get().iui.find(x => x.id === id) : null) || {};
         const isDone = !!r.actual_date;
         
         let dateVal = d;
@@ -1472,24 +1730,29 @@ ${pastDataText}
         const eventLabel = isTiming ? 'タイミング' : 'IUI';
         
         return `
-          <div class="mb-6">
-            <label class="block text-[13px] font-bold mb-1 text-main">予定日</label>
-            <input type="date" id="form-planned" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none" value="${dateVal}">
+          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+            <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">${isTiming ? 'TIMING' : 'IUI EVENT'}</p>
+            <p class="text-sm text-main leading-relaxed">${eventLabel}の予定と実施状況をまとめて管理します。</p>
+          </div>
+          <div class="mb-5">
+            <label class="field-label" for="form-planned">予定日 <span class="field-required">必須</span></label>
+            <input type="date" id="form-planned" class="form-control px-4 py-3 text-[16px] outline-none" value="${dateVal}" required>
           </div>
           
-          <div class="mb-8 p-4 bg-slate-50 border border-border rounded-xl flex items-center justify-between">
+          <div class="mb-6 p-4 bg-white border border-border rounded-2xl flex items-center justify-between gap-4">
             <div>
               <div class="font-bold text-[14px] text-main">実施ステータス</div>
               <div class="text-[11px] text-sub mt-0.5" id="form-actual-text">${isDone ? `${eventLabel}済みとして記録されています` : '未実施（予定）'}</div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="form-actual-check" class="sr-only peer" ${isDone ? 'checked' : ''} onchange="document.getElementById('form-actual-text').innerText = this.checked ? '${eventLabel}済みとして記録されます' : '未実施（予定）'">
+              <input type="checkbox" id="form-actual-check" class="sr-only peer" aria-label="${eventLabel}を実施済みにする" ${isDone ? 'checked' : ''} onchange="document.getElementById('form-actual-text').innerText = this.checked ? '${eventLabel}済みとして記録されます' : '未実施（予定）'">
               <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
           
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('iui')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">保存する</button>
+          <div id="form-error" class="form-error hidden mb-4 rounded-xl px-3.5 py-3 text-[12px] font-bold" role="alert"></div>
+          <button id="form-submit" onclick="App.submitForm('iui')" class="btn-primary w-full py-4 rounded-2xl font-bold" data-default-label="${r.id ? '変更を保存' : '予定を保存'}">${r.id ? '変更を保存' : '予定を保存'}</button>
           ${id ? `<button onclick="App.deleteRecord('iui', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この予定を削除</button>` : ''}
         `;
       },
@@ -1497,13 +1760,17 @@ ${pastDataText}
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().cycles.find(x => x.id === id) || {};
         return `
-          <div class="mb-4">
-            <label class="block text-[13px] font-bold mb-1 text-main">生理開始日</label>
-            <input type="date" id="form-date" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : d}">
+          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+            <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">CYCLE</p>
+            <p class="text-sm text-main leading-relaxed">生理開始日を基準に、予測とすべての記録を周期へ紐づけます。</p>
           </div>
-          <div class="mb-4">
-            <label class="block text-[13px] font-bold mb-1 text-main">周期タイプ</label>
-            <select id="form-type" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
+          <div class="mb-5">
+            <label class="field-label" for="form-date">生理開始日 <span class="field-required">必須</span></label>
+            <input type="date" id="form-date" class="form-control px-4 py-3 text-[16px]" value="${r.start_date ? Utils.toLocalYYYYMMDD(r.start_date) : d}" required>
+          </div>
+          <div class="mb-5">
+            <label class="field-label" for="form-type">周期タイプ <span class="field-required">必須</span></label>
+            <select id="form-type" class="form-control px-4 py-3 text-[16px] outline-none">
               <option value="人工授精周期" ${r.type==='人工授精周期'?'selected':''}>人工授精周期</option>
               <option value="タイミング周期" ${r.type==='タイミング周期'?'selected':''}>タイミング周期</option>
               <option value="自然周期" ${r.type==='自然周期'?'selected':''}>自然周期</option>
@@ -1511,14 +1778,15 @@ ${pastDataText}
             </select>
           </div>
           <div class="mb-6">
-            <label class="block text-[13px] font-bold mb-1 text-main">ステータス</label>
-            <select id="form-status" class="form-control w-full bg-slate-50 border border-border rounded-xl px-4 py-3 text-[16px] outline-none">
+            <label class="field-label" for="form-status">ステータス <span class="field-required">必須</span></label>
+            <select id="form-status" class="form-control px-4 py-3 text-[16px] outline-none">
               <option value="進行中" ${r.status==='進行中'?'selected':''}>進行中</option>
               <option value="周期終了" ${r.status==='周期終了'?'selected':''}>周期終了</option>
             </select>
           </div>
           <input type="hidden" id="form-id" value="${r.id || ''}">
-          <button onclick="App.submitForm('cycles')" class="w-full max-w-full box-border bg-primary text-white font-bold py-4 rounded-[16px] shadow-sm active:scale-[0.98] transition-transform">周期を保存</button>
+          <div id="form-error" class="form-error hidden mb-4 rounded-xl px-3.5 py-3 text-[12px] font-bold" role="alert"></div>
+          <button id="form-submit" onclick="App.submitForm('cycles')" class="btn-primary w-full py-4 rounded-2xl font-bold" data-default-label="${r.id ? '変更を保存' : '周期を保存'}">${r.id ? '変更を保存' : '周期を保存'}</button>
           ${id ? `<button onclick="App.deleteRecord('cycles', '${id}', this)" class="w-full mt-3 py-3 rounded-xl border border-rose-200 text-rose-500 font-bold text-sm bg-rose-50 transition-colors">この周期を削除</button>` : ''}
         `;
       },
@@ -1527,17 +1795,46 @@ ${pastDataText}
 
     const App = {
       chartInstance: null,
+      isSubmitting: false,
+      modalDirty: false,
+      confirmCloseArmed: false,
+      modalTrigger: null,
 
       async init() {
         this.render();
         document.getElementById('global-loading').classList.add('hidden');
+        document.addEventListener('keydown', (event) => {
+          const modal = document.getElementById('modal-sheet');
+          if (!modal.classList.contains('open')) return;
+          if (event.key === 'Escape') {
+            this.closeModal();
+            return;
+          }
+          if (event.key !== 'Tab') return;
+          const focusable = [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])')]
+            .filter(element => !element.hasAttribute('hidden') && element.offsetParent !== null);
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        });
       },
 
       render() {
         const { currentView, syncStatus } = Store.get();
         const content = document.getElementById('app-content');
+        const nav = document.querySelector('nav');
+        const isAuthGate = syncStatus === 'signed-out' || syncStatus === 'syncing' || syncStatus === 'error';
 
-        if (syncStatus === 'signed-out' && currentView !== 'settings') {
+        if (syncStatus === 'error') {
+          content.innerHTML = Views.syncError();
+        } else if (syncStatus === 'signed-out' && currentView !== 'settings') {
           content.innerHTML = Views.authRequired();
         } else if (syncStatus === 'syncing' && currentView !== 'settings') {
           content.innerHTML = Views.syncing();
@@ -1545,12 +1842,15 @@ ${pastDataText}
           content.innerHTML = Views[currentView] ? Views[currentView]() : '';
         }
         content.classList.remove('hidden');
+        nav.classList.toggle('hidden', isAuthGate);
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
           if(btn.dataset.target === currentView) {
             btn.classList.add('text-primary'); btn.classList.remove('text-sub');
+            btn.setAttribute('aria-current', 'page');
           } else {
             btn.classList.remove('text-primary'); btn.classList.add('text-sub');
+            btn.removeAttribute('aria-current');
           }
         });
 
@@ -1765,8 +2065,20 @@ ${pastDataText}
       switchDashTab(tab) { Store.set({ dashTab: tab }); },
 
       openModal(type, id = null, defaultDate = null) {
+        this.isSubmitting = false;
+        this.modalDirty = false;
+        this.confirmCloseArmed = false;
+        this.modalTrigger = document.activeElement;
+        if (type === 'daily' && !id) {
+          const targetDate = defaultDate || Utils.getTodayStr();
+          const existing = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === targetDate);
+          if (existing) id = existing.id;
+        }
         document.getElementById('modal-title').innerText = getFormTitle(type);
-        document.getElementById('modal-body').innerHTML = Forms[type](id, defaultDate);
+        const modalBody = document.getElementById('modal-body');
+        modalBody.innerHTML = Forms[type](id, defaultDate);
+        modalBody.oninput = () => { this.modalDirty = true; };
+        modalBody.onchange = () => { this.modalDirty = true; };
         
         const overlay = document.getElementById('modal-overlay');
         const sheet = document.getElementById('modal-sheet');
@@ -1775,14 +2087,41 @@ ${pastDataText}
         void overlay.offsetWidth;
         overlay.classList.remove('opacity-0'); overlay.classList.add('opacity-100');
         sheet.classList.remove('closed'); sheet.classList.add('open');
+        sheet.removeAttribute('inert');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+          const firstField = document.querySelector('#modal-body input:not([type="hidden"]), #modal-body select, #modal-body textarea');
+          firstField?.focus({ preventScroll: true });
+        }, 220);
       },
 
-      closeModal() {
+      closeModal(force = false) {
+        if (this.isSubmitting && !force) return;
+        if (this.modalDirty && !force) {
+          if (!this.confirmCloseArmed) {
+            this.confirmCloseArmed = true;
+            Utils.showToast('入力内容があります。もう一度閉じると破棄します', true);
+            setTimeout(() => { this.confirmCloseArmed = false; }, 3000);
+            return;
+          }
+        }
         const overlay = document.getElementById('modal-overlay');
         const sheet = document.getElementById('modal-sheet');
+        if (this.modalTrigger && typeof this.modalTrigger.focus === 'function') {
+          this.modalTrigger.focus({ preventScroll: true });
+        }
         sheet.classList.remove('open'); sheet.classList.add('closed');
+        sheet.setAttribute('aria-hidden', 'true');
+        sheet.setAttribute('inert', '');
         overlay.classList.remove('opacity-100'); overlay.classList.add('opacity-0');
-        setTimeout(() => { overlay.classList.add('hidden'); }, 300);
+        document.body.style.overflow = '';
+        this.modalDirty = false;
+        this.confirmCloseArmed = false;
+        setTimeout(() => {
+          overlay.classList.add('hidden');
+          this.modalTrigger = null;
+        }, 300);
       },
 
       getCycleForDate(dateStr) {
@@ -1792,7 +2131,7 @@ ${pastDataText}
         for (const c of sorted) {
           if (dateStr >= Utils.toLocalYYYYMMDD(c.start_date)) return c;
         }
-        return sorted[sorted.length - 1];
+        return null;
       },
       
       getCycleTypeForDate(dateStr) {
@@ -1802,16 +2141,85 @@ ${pastDataText}
         for (const c of sorted) {
           if (dateStr >= Utils.toLocalYYYYMMDD(c.start_date)) return c.type;
         }
-        return sorted[sorted.length - 1].type;
+        return null;
       },
 
       checkExistingDaily(dateStr) {
         const r = Store.get().daily.find(x => Utils.toLocalYYYYMMDD(x.date) === dateStr);
-        document.getElementById('form-id').value = r ? r.id : '';
-        document.getElementById('form-temp').value = r ? (r.temperature || '') : '';
+        const idField = document.getElementById('form-id');
+        const tempField = document.getElementById('form-temp');
+        const originalId = document.getElementById('form-original-id')?.value || '';
+        idField.value = r ? r.id : originalId;
+        if (r) {
+          tempField.value = r.temperature || '';
+        } else if (!originalId) {
+          tempField.value = '';
+        }
+        const note = document.getElementById('form-existing-note');
+        const submit = document.getElementById('form-submit');
+        note?.classList.toggle('hidden', !r && !originalId);
+        if (submit) {
+          const label = r || originalId ? '変更を保存' : '記録を保存';
+          submit.dataset.defaultLabel = label;
+          submit.innerText = label;
+        }
       },
 
-      submitForm(table) {
+      setFormError(message = '') {
+        const error = document.getElementById('form-error');
+        if (!error) return;
+        error.innerText = message;
+        error.classList.toggle('hidden', !message);
+        if (message) error.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      },
+
+      setSubmitState(isSaving) {
+        const button = document.getElementById('form-submit');
+        this.isSubmitting = isSaving;
+        if (!button) return;
+        button.disabled = isSaving;
+        button.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+        button.innerText = isSaving ? '保存しています…' : (button.dataset.defaultLabel || '保存する');
+      },
+
+      validateForm(table, payload) {
+        if (table === 'daily') {
+          if (!payload.date) return '日付を選択してください。';
+          if (payload.date > Utils.getTodayStr()) return '基礎体温は今日以前の日付で記録してください。';
+          if (payload.temperature === '') return '基礎体温を入力してください。';
+          const temperature = Number(payload.temperature);
+          if (!Number.isFinite(temperature) || temperature < 34 || temperature > 42) {
+            return '基礎体温は34.00〜42.00°Cの範囲で入力してください。';
+          }
+        }
+        if (table === 'clinic') {
+          if (!payload.visit_date) return '受診日を選択してください。';
+          if (payload.visit_date > Utils.getTodayStr()) return '受診日は今日以前の日付を選択してください。';
+          if (payload.next_visit_date && payload.next_visit_date < payload.visit_date) {
+            return '次回受診日は受診日以降の日付を選択してください。';
+          }
+        }
+        if (table === 'iui' && !payload.planned_date) return '予定日を選択してください。';
+        if (table === 'cycles') {
+          if (!payload.start_date) return '生理開始日を選択してください。';
+          if (payload.start_date > Utils.getTodayStr()) return '生理開始日は今日以前の日付を選択してください。';
+          const duplicate = Store.get().cycles.some(cycle =>
+            cycle.id !== payload.id && Utils.toLocalYYYYMMDD(cycle.start_date) === payload.start_date
+          );
+          if (duplicate) return '同じ開始日の周期がすでに登録されています。';
+          const currentCycle = Store.get().cycles.find(cycle => cycle.id === payload.id);
+          if (currentCycle && Utils.toLocalYYYYMMDD(currentCycle.start_date) !== payload.start_date) {
+            const state = Store.get();
+            const linkedCount = [...state.daily, ...state.clinic, ...state.iui, ...state.aiPredictions]
+              .filter(item => item.cycle_id === payload.id).length;
+            if (linkedCount > 0) return `関連する記録が${linkedCount}件あるため、開始日は変更できません。`;
+          }
+        }
+        return '';
+      },
+
+      async submitForm(table) {
+        if (this.isSubmitting) return;
         const id = document.getElementById('form-id')?.value;
         const payload = { id };
 
@@ -1830,10 +2238,30 @@ ${pastDataText}
           payload.status = document.getElementById('form-status').value;
         }
 
-        API.save(table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles', payload);
+        const validationError = this.validateForm(table, payload);
+        if (validationError) {
+          this.setFormError(validationError);
+          return;
+        }
+        if (table === 'daily') payload.temperature = Number(payload.temperature).toFixed(2);
+
+        this.setFormError('');
+        this.setSubmitState(true);
+        const dbTable = table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles';
+        const saved = await API.save(dbTable, payload);
+        if (!saved) this.setSubmitState(false);
       },
 
       async deleteRecord(table, id, btnEl) {
+        if (table === 'cycles') {
+          const state = Store.get();
+          const linkedCount = [...state.daily, ...state.clinic, ...state.iui, ...state.aiPredictions]
+            .filter(item => item.cycle_id === id).length;
+          if (linkedCount > 0) {
+            Utils.showToast(`関連する記録が${linkedCount}件あるため、この周期は削除できません`, true);
+            return;
+          }
+        }
         if (!btnEl.dataset.confirm) {
            btnEl.dataset.confirm = "true";
            btnEl.classList.add('bg-rose-500', 'text-white');
@@ -1850,18 +2278,11 @@ ${pastDataText}
            return;
         }
         
-        const targetArrayKey = table; 
-        let newArray = Store.get()[targetArrayKey].filter(item => item.id !== id);
-        
         const dbTable = table === 'daily' ? 'daily_records' : table === 'clinic' ? 'clinic_visits' : table === 'iui' ? 'iui_events' : 'cycles';
 
         try {
           await window.FirebaseSync?.delete(dbTable, id);
-          Store.set({ [targetArrayKey]: newArray });
-          if(table === 'cycles') {
-            Store.set({ activeCycle: newArray.length > 0 ? newArray[newArray.length - 1] : null });
-          }
-          App.closeModal();
+          App.closeModal(true);
           Utils.showToast('削除しました');
         } catch(e) {
           console.warn('Firestore delete error:', e);
@@ -1894,16 +2315,16 @@ ${pastDataText}
         return Math.round(avg * 100) / 100;
       },
 
-      applyCycleStat(val) {
+      async applyCycleStat(val) {
         document.getElementById('set-cycle-len').value = val;
-        this.updateSettings('cycleLen', val);
-        Utils.showToast(`${val}日に設定しました`);
+        const saved = await this.updateSettings('cycleLen', val);
+        if (saved) Utils.showToast(`${val}日に設定しました`);
       },
 
-      applyBaseTempStat(val) {
+      async applyBaseTempStat(val) {
         document.getElementById('set-base-temp').value = val.toFixed(2);
-        this.updateSettings('baseTemp', val);
-        Utils.showToast(`基準線を${val.toFixed(2)}℃に設定しました`);
+        const saved = await this.updateSettings('baseTemp', val);
+        if (saved) Utils.showToast(`基準線を${val.toFixed(2)}℃に設定しました`);
       },
 
       getPredictions() {
@@ -2069,6 +2490,7 @@ ${pastDataText}
       selectDate(dStr) {
         document.querySelectorAll('[id^="cal-cell-"]').forEach(el => {
           el.classList.remove('bg-primary', 'text-white');
+          el.setAttribute('aria-pressed', 'false');
           const dot = el.querySelector('.bg-white');
           if(dot) dot.classList.replace('bg-white', 'bg-primary');
         });
@@ -2076,6 +2498,7 @@ ${pastDataText}
         const targetEl = document.getElementById(`cal-cell-${dStr}`);
         if(targetEl) {
           targetEl.classList.add('bg-primary', 'text-white');
+          targetEl.setAttribute('aria-pressed', 'true');
           const dot = targetEl.querySelector('.bg-primary');
           if(dot && targetEl.classList.contains('bg-primary')) dot.classList.replace('bg-primary', 'bg-white');
         }
@@ -2174,37 +2597,57 @@ ${pastDataText}
         `;
       },
 
-      updateSettings(key, val) {
-        const s = { ...Store.get().settings };
-        s[key] = key === 'baseTemp' ? parseFloat(val) : parseInt(val, 10);
-        Store.set({ settings: s });
-        window.FirebaseSync?.savePreferences({ appSettings: s })
-          .catch((e) => {
-            console.warn('Firestore settings save error:', e);
-            Utils.showToast('設定を保存できませんでした', true);
-          });
+      async updateSettings(key, val) {
+        const previous = { ...Store.get().settings };
+        const next = { ...previous };
+        const parsed = key === 'baseTemp' ? parseFloat(val) : parseInt(val, 10);
+        const invalidCycle = key === 'cycleLen' && (!Number.isFinite(parsed) || parsed < 20 || parsed > 60);
+        const invalidTemp = key === 'baseTemp' && (!Number.isFinite(parsed) || parsed < 34 || parsed > 42);
+        if (invalidCycle || invalidTemp || !Number.isFinite(parsed)) {
+          Utils.showToast(invalidCycle ? '平均周期は20〜60日の範囲で入力してください' : '基準線は34.00〜42.00°Cで入力してください', true);
+          Store.set({ settings: previous });
+          return false;
+        }
+        next[key] = parsed;
+        Store.set({ settings: next });
+        try {
+          await window.FirebaseSync?.saveSetting(key, parsed);
+          return true;
+        } catch (e) {
+          console.warn('Firestore settings save error:', e);
+          Store.set({ settings: previous });
+          Utils.showToast('設定を保存できませんでした。元の値に戻しました', true);
+          return false;
+        }
       },
       
-      updateApiKey(val) {
+      async updateApiKey(val) {
+        const previous = Store.get().apiKey;
         const key = val.trim();
         Store.set({ apiKey: key });
-        window.FirebaseSync?.savePreferences({ apiKey: key })
-          .then(() => Utils.showToast('APIキーを保存しました'))
-          .catch((e) => {
-            console.warn('Firestore API key save error:', e);
-            Utils.showToast('APIキーを保存できませんでした', true);
-          });
+        try {
+          await window.FirebaseSync?.saveApiKey(key);
+          Utils.showToast('APIキーを保存しました');
+        } catch (e) {
+          console.warn('Firestore API key save error:', e);
+          Store.set({ apiKey: previous });
+          Utils.showToast('APIキーを保存できませんでした。元の値に戻しました', true);
+        }
       },
 
-      updateAiMemo(cycleId, value) {
+      async updateAiMemo(cycleId, value) {
         if (!cycleId) return;
-        const aiMemos = { ...Store.get().aiMemos, [cycleId]: value };
+        const previous = { ...Store.get().aiMemos };
+        const aiMemos = { ...previous, [cycleId]: value };
         Store.set({ aiMemos });
-        window.FirebaseSync?.savePreferences({ aiMemos })
-          .catch((e) => {
-            console.warn('Firestore AI memo save error:', e);
-            Utils.showToast('AIメモを保存できませんでした', true);
-          });
+        try {
+          await window.FirebaseSync?.saveAiMemo(cycleId, value);
+          Utils.showToast('AIメモを保存しました');
+        } catch (e) {
+          console.warn('Firestore AI memo save error:', e);
+          Store.set({ aiMemos: previous });
+          Utils.showToast('AIメモを保存できませんでした。元の内容に戻しました', true);
+        }
       },
 
       async signInToSync() {
@@ -2224,6 +2667,15 @@ ${pastDataText}
         } catch (e) {
           console.warn('Firebase sign out error:', e);
           Utils.showToast('同期解除に失敗しました', true);
+        }
+      },
+
+      async retrySync() {
+        try {
+          await window.FirebaseSync?.retry();
+        } catch (e) {
+          console.warn('Firebase retry error:', e);
+          Utils.showToast('同期を再開できませんでした', true);
         }
       },
       
