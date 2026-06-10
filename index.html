@@ -301,17 +301,23 @@
       theme: {
         extend: {
           colors: {
-            primary: '#334155',       // slate-700 (ネイビー系)
-            'primary-light': '#e2e8f0', // slate-200 (薄いグレー)
-            bg: '#f8fafc',             // slate-50 (背景)
-            card: '#ffffff',
-            main: '#1e293b',          // slate-800
-            sub: '#64748b',           // slate-500
-            border: '#e2e8f0'
+            primary: '#d9788c',
+            'primary-light': '#f9e8ec',
+            bg: '#faf9f7',
+            card: '#fffefd',
+            main: '#34343b',
+            sub: '#85858f',
+            border: '#ebe8e4',
+            sage: '#8eae9b',
+            'sage-light': '#eaf2ed',
+            'wellness-blue': '#83aeca',
+            'wellness-blue-light': '#eaf3f8',
+            lilac: '#a895bd',
+            'lilac-light': '#f1edf5'
           },
           fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', '"Hiragino Sans"', 'sans-serif'],
-            serif: ['serif']
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Hiragino Sans"', '"Noto Sans JP"', 'sans-serif'],
+            serif: ['"New York"', '"Hiragino Mincho ProN"', 'serif']
           }
         }
       }
@@ -319,13 +325,23 @@
   </script>
   
   <style>
+    :root {
+      --rose: #d9788c;
+      --rose-soft: #f9e8ec;
+      --sage: #8eae9b;
+      --sage-soft: #eaf2ed;
+      --sky: #83aeca;
+      --sky-soft: #eaf3f8;
+      --ink: #34343b;
+      --muted: #85858f;
+      --surface: rgba(255, 254, 253, 0.82);
+      --shadow: 0 18px 55px rgba(83, 70, 73, 0.08);
+    }
     html, body {
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
       min-height: 100%;
-      background:
-        radial-gradient(circle at 18% 0%, rgba(226, 232, 240, 0.95), transparent 34rem),
-        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+      background: #faf9f7;
     }
     body::before {
       content: "";
@@ -333,64 +349,82 @@
       inset: 0;
       pointer-events: none;
       background:
-        radial-gradient(circle at 84% 12%, rgba(56, 189, 248, 0.10), transparent 20rem),
-        radial-gradient(circle at 20% 88%, rgba(244, 114, 182, 0.08), transparent 18rem);
+        radial-gradient(circle at 8% 4%, rgba(249, 220, 227, 0.72), transparent 28rem),
+        radial-gradient(circle at 92% 22%, rgba(220, 238, 230, 0.74), transparent 28rem),
+        radial-gradient(circle at 48% 92%, rgba(222, 236, 246, 0.58), transparent 30rem);
       z-index: -1;
     }
+    body { color: var(--ink); letter-spacing: -0.01em; }
+    button, input, select, textarea { font: inherit; }
+    button { -webkit-touch-callout: none; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    .bottom-sheet { transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+    .bottom-sheet { transition: transform 0.46s cubic-bezier(0.22, 1, 0.36, 1); }
     .bottom-sheet.open { transform: translateY(0); }
-    .bottom-sheet.closed { transform: translateY(100%); }
-    .fade-in { animation: fadeIn 0.2s ease-in forwards; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .bottom-sheet.closed { transform: translateY(104%); }
+    body:has(.bottom-sheet.open) #app-content,
+    body:has(.bottom-sheet.open) nav {
+      transform: scale(.965) translateY(-8px);
+      filter: saturate(.85);
+      border-radius: 30px;
+    }
+    .fade-in { animation: fadeIn 0.38s cubic-bezier(.22,1,.36,1) forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes sheetFade { from { opacity: 0; } to { opacity: 1; } }
     
     /* iOS Safe Area Paddings */
-    .padding-safe-nav { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 90px); }
-    .padding-safe-modal { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 40px); }
+    .padding-safe-nav { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 112px); }
+    .padding-safe-modal { padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 32px); }
     .padding-safe-toast { top: calc(env(safe-area-inset-top, 20px) + 10px); }
-    .app-shell { max-width: 760px; margin: 0 auto; }
+    .app-shell {
+      max-width: 720px;
+      margin: 0 auto;
+      transition: transform .46s cubic-bezier(.22,1,.36,1), filter .35s ease, border-radius .35s ease;
+      transform-origin: 50% 8%;
+    }
     .card-soft {
-      background: rgba(255, 255, 255, 0.86);
-      border: 1px solid rgba(226, 232, 240, 0.82);
-      box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
-      backdrop-filter: blur(18px);
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px) saturate(1.15);
     }
     .hero-card {
       background:
-        linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(51, 65, 85, 0.92)),
-        radial-gradient(circle at 85% 20%, rgba(125, 211, 252, 0.24), transparent 14rem);
-      color: white;
-      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
+        radial-gradient(circle at 90% 0%, rgba(255,255,255,.62), transparent 14rem),
+        linear-gradient(145deg, #f5dce3 0%, #eef3ee 54%, #e8f1f6 100%);
+      color: var(--ink);
+      box-shadow: 0 24px 65px rgba(161, 124, 135, 0.12);
     }
     .nav-shell {
-      max-width: 680px;
-      margin: 0 auto;
-      border-radius: 28px 28px 0 0;
-      box-shadow: 0 -16px 42px rgba(15, 23, 42, 0.08);
+      max-width: 630px;
+      margin: 0 auto 10px;
+      border-radius: 30px;
+      box-shadow: 0 18px 55px rgba(76, 67, 70, 0.16);
+      transition: transform .46s cubic-bezier(.22,1,.36,1), filter .35s ease;
     }
     .nav-btn {
-      min-height: 54px;
-      border-radius: 18px;
+      min-height: 52px;
+      border-radius: 17px;
+      position: relative;
     }
-    .nav-btn svg { width: 21px; height: 21px; stroke-width: 1.9; }
+    .nav-btn svg { width: 20px; height: 20px; stroke-width: 1.75; }
     .nav-btn.text-primary {
-      background: rgba(226, 232, 240, 0.74);
-      color: #1e293b;
+      background: rgba(249, 232, 236, 0.88);
+      color: var(--rose);
       font-weight: 800;
     }
     .nav-add {
-      width: 58px;
-      height: 58px;
-      margin-top: -22px;
-      border: 5px solid rgba(248, 250, 252, 0.98);
-      border-radius: 22px;
-      background: #1e293b;
+      width: 56px;
+      height: 56px;
+      margin-top: -20px;
+      border: 5px solid rgba(250, 249, 247, 0.95);
+      border-radius: 20px;
+      background: linear-gradient(145deg, #e38a9d, #cf6e84);
       color: #fff;
-      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+      box-shadow: 0 14px 30px rgba(197, 96, 119, 0.28);
     }
     .eyebrow {
-      color: #64748b;
+      color: #a17883;
       font-size: 0.72rem;
       font-weight: 800;
       letter-spacing: 0.12em;
@@ -411,33 +445,35 @@
       top: 40px;
       bottom: 0;
       width: 1px;
-      background: #e2e8f0;
+      background: linear-gradient(#e8c4cd, #dfeae4);
     }
     .forecast-card {
-      border: 1px dashed #cbd5e1;
-      background: rgba(248, 250, 252, 0.82);
+      border: 1px solid rgba(255,255,255,.72);
+      background: rgba(255, 254, 253, 0.72);
+      box-shadow: var(--shadow);
     }
     .btn-primary {
-      background: #334155;
+      background: linear-gradient(135deg, #df8497, #cf6f85);
       color: #fff;
-      box-shadow: 0 12px 28px rgba(51, 65, 85, 0.18);
+      box-shadow: 0 12px 28px rgba(201, 99, 123, 0.22);
       transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
     }
     .btn-primary:active { transform: scale(0.985); }
     .btn-primary:disabled { opacity: 0.62; cursor: wait; box-shadow: none; }
-    .field-label { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.45rem; font-size: 0.8rem; font-weight: 750; color: #334155; }
-    .field-required { color: #e11d48; font-size: 0.65rem; font-weight: 800; }
-    .field-hint { margin-top: 0.45rem; font-size: 0.68rem; line-height: 1.55; color: #64748b; }
+    .field-label { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.55rem; font-size: 0.82rem; font-weight: 700; color: #55545b; }
+    .field-required { color: var(--rose); font-size: 0.64rem; font-weight: 800; }
+    .field-hint { margin-top: 0.5rem; font-size: 0.72rem; line-height: 1.6; color: var(--muted); }
     .form-control {
-      min-height: 50px;
-      border-radius: 14px !important;
-      border: 1px solid rgba(203, 213, 225, 0.95) !important;
-      background: rgba(255, 255, 255, 0.92) !important;
+      min-height: 54px;
+      border-radius: 17px !important;
+      border: 1px solid transparent !important;
+      background: rgba(255, 255, 255, 0.82) !important;
+      box-shadow: inset 0 0 0 1px rgba(222, 216, 213, .7), 0 8px 24px rgba(85, 70, 74, .04);
       transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
     }
     .form-control:focus {
-      border-color: #64748b !important;
-      box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.18);
+      border-color: rgba(217, 120, 140, .42) !important;
+      box-shadow: 0 0 0 4px rgba(217, 120, 140, 0.12);
       background: #fff !important;
     }
     select.form-control {
@@ -453,14 +489,14 @@
       color: #be123c;
     }
     button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
-      outline: 3px solid rgba(56, 189, 248, 0.35);
+      outline: 3px solid rgba(217, 120, 140, 0.25);
       outline-offset: 2px;
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
     @media (min-width: 768px) {
-      .nav-shell { bottom: 18px; border-radius: 999px; border: 1px solid rgba(226, 232, 240, 0.9); }
+      .nav-shell { bottom: 10px; border-radius: 30px; border: 1px solid rgba(255,255,255,.76); }
       .padding-safe-nav { padding-bottom: 130px; }
     }
     
@@ -475,7 +511,7 @@
     }
   </style>
 </head>
-<body class="text-main font-sans antialiased overflow-x-hidden">
+<body class="text-main font-sans antialiased overflow-x-hidden selection:bg-primary-light selection:text-main">
 
   <div id="global-loading" class="fixed inset-0 bg-white/90 z-[100] flex flex-col items-center justify-center fade-in" role="status" aria-live="polite">
     <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mb-4"></div>
@@ -485,20 +521,20 @@
 
   <div id="toast" class="fixed padding-safe-toast left-1/2 -translate-x-1/2 bg-gray-800 text-white px-5 py-3 rounded-2xl text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-lg max-w-[calc(100vw-32px)] text-center" role="status" aria-live="polite"></div>
 
-  <main id="app-content" class="app-shell w-full min-h-screen px-4 sm:px-6 pt-5 sm:pt-8 padding-safe-nav hidden fade-in"></main>
+  <main id="app-content" class="app-shell w-full min-h-screen px-5 sm:px-7 pt-7 sm:pt-10 padding-safe-nav hidden fade-in"></main>
 
-  <div id="modal-overlay" class="fixed inset-0 bg-slate-950/35 backdrop-blur-[2px] z-40 hidden transition-opacity opacity-0" onclick="App.closeModal()"></div>
-  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-0 bottom-0 z-50 bg-card rounded-t-[32px] shadow-[0_-18px_60px_rgba(15,23,42,0.16)] max-h-[88vh] flex flex-col max-w-[760px] mx-auto overflow-x-hidden box-border" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true" inert>
-    <div class="w-10 h-1 rounded-full bg-slate-200 mx-auto mt-3 shrink-0" aria-hidden="true"></div>
-    <div class="sticky top-0 bg-card/95 backdrop-blur z-10 px-6 py-4 flex justify-between items-center border-b border-border/50 shrink-0">
-      <h3 id="modal-title" class="text-lg font-bold">タイトル</h3>
-      <button onclick="App.closeModal()" class="text-sub p-2 -mr-2 bg-gray-100 rounded-full w-11 h-11 flex items-center justify-center font-bold" aria-label="閉じる">✕</button>
+  <div id="modal-overlay" class="fixed inset-0 bg-[#493f42]/25 backdrop-blur-[8px] z-40 hidden transition-opacity duration-300 opacity-0" onclick="App.closeModal()"></div>
+  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-3 sm:inset-x-5 bottom-2 sm:bottom-5 z-50 bg-card/95 backdrop-blur-2xl rounded-[34px] shadow-[0_28px_90px_rgba(76,58,65,0.22)] max-h-[90vh] flex flex-col max-w-[690px] mx-auto overflow-x-hidden box-border border border-white/80" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true" inert>
+    <div class="w-9 h-1 rounded-full bg-[#ded8d5] mx-auto mt-3 shrink-0" aria-hidden="true"></div>
+    <div class="sticky top-0 bg-card/80 backdrop-blur-2xl z-10 px-6 py-4 flex justify-between items-center shrink-0">
+      <h3 id="modal-title" class="text-[19px] tracking-tight font-bold">タイトル</h3>
+      <button onclick="App.closeModal()" class="text-sub bg-[#f2efec] rounded-full w-10 h-10 flex items-center justify-center" aria-label="閉じる"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
-    <div id="modal-body" class="p-5 sm:p-6 flex-1 overflow-y-auto no-scrollbar padding-safe-modal bg-slate-50/80"></div>
+    <div id="modal-body" class="px-5 sm:px-6 pt-2 flex-1 overflow-y-auto no-scrollbar padding-safe-modal bg-gradient-to-b from-transparent to-[#faf7f5]/75"></div>
   </div>
 
-  <nav class="nav-shell fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-xl border-t border-border z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
-    <div class="flex justify-around items-center h-[76px] px-2.5 gap-1" id="nav-container">
+  <nav class="nav-shell fixed bottom-0 inset-x-3 bg-white/75 backdrop-blur-2xl border border-white/80 z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+    <div class="flex justify-around items-center h-[72px] px-2.5 gap-1" id="nav-container">
       <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="home" aria-label="今日"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></svg>今日</button>
       <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="calendar" aria-label="カレンダー"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>予定</button>
       <button onclick="App.openModal('quick-add')" class="nav-add shrink-0 flex items-center justify-center" aria-label="記録を追加"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2.2" d="M12 5v14M5 12h14"/></svg></button>
@@ -975,14 +1011,22 @@ ${pastDataText}
 
     const Views = {
       authRequired: () => `
-        <div class="min-h-[70vh] flex items-center justify-center">
-          <div class="w-full max-w-md card-soft rounded-[32px] p-7 text-center">
-            <div class="mx-auto mb-5 w-16 h-16 rounded-[24px] bg-primary text-white flex items-center justify-center text-3xl shadow-lg shadow-slate-300/60">📈</div>
-            <p class="text-xs text-sub font-bold tracking-[0.24em] mb-3">SECURE CLOUD</p>
-            <h1 class="text-3xl font-serif tracking-wider text-main mb-3">Rhythm</h1>
-            <p class="text-sm text-sub leading-relaxed mb-6">周期・体温・通院記録をFirebaseで安全に同期します。スマホでも同じGoogleアカウントで続きから見られます。</p>
-            <button onclick="App.signInToSync()" class="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-sm active:scale-[0.98] transition-transform">Googleでログイン</button>
-            <p class="text-[11px] text-sub leading-relaxed mt-4">データの保存先はFirestoreだけ。端末を替えても同じ記録を確認できます。</p>
+        <div class="min-h-[76vh] flex items-center justify-center py-10">
+          <div class="w-full max-w-md text-center">
+            <div class="mx-auto mb-7 w-20 h-20 rounded-[28px] bg-gradient-to-br from-primary-light via-white to-sage-light text-primary flex items-center justify-center shadow-[0_22px_55px_rgba(186,117,134,.18)]">
+              <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 13.5h3l2-6 3 10 2.2-7 1.8 3H20"/></svg>
+            </div>
+            <p class="eyebrow mb-3">Private wellness journal</p>
+            <h1 class="text-[42px] leading-none font-serif tracking-[-0.04em] text-main mb-5">Rhythm</h1>
+            <p class="text-[15px] text-sub leading-7 max-w-sm mx-auto mb-9">周期、基礎体温、通院の記録をひとつに。あなたのペースで続けられる、静かな治療サポートです。</p>
+            <button onclick="App.signInToSync()" class="btn-primary w-full py-4 rounded-[20px] font-bold flex items-center justify-center gap-3">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3Z"/><path fill="currentColor" opacity=".72" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.4-4H3.3v2.6A10 10 0 0 0 12 22Z"/><path fill="currentColor" opacity=".48" d="M6.6 14a6 6 0 0 1 0-4V7.4H3.3a10 10 0 0 0 0 9.2L6.6 14Z"/><path fill="currentColor" opacity=".3" d="M12 5.9c1.5 0 2.9.5 4 1.6l3-3A10 10 0 0 0 3.3 7.4L6.6 10A5.8 5.8 0 0 1 12 5.9Z"/></svg>
+              Googleで続ける
+            </button>
+            <div class="mt-6 flex items-center justify-center gap-2 text-[12px] text-sub">
+              <svg class="w-4 h-4 text-sage" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 11V8a5 5 0 0 1 10 0v3m-11 0h12v9H6v-9Z"/></svg>
+              Firestoreへ安全に保存し、端末間で同期します
+            </div>
           </div>
         </div>
       `,
@@ -990,20 +1034,20 @@ ${pastDataText}
       syncing: () => `
         <div class="min-h-[70vh] flex items-center justify-center">
           <div class="text-center">
-            <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-light border-t-primary mx-auto mb-4"></div>
-            <p class="text-sm font-bold text-main">Firebaseから読み込んでいます</p>
-            <p class="text-xs text-sub mt-2">少しだけお待ちください</p>
+            <div class="animate-spin rounded-full h-11 w-11 border-[3px] border-primary-light border-t-primary mx-auto mb-5"></div>
+            <p class="text-[15px] font-bold text-main">記録を整えています</p>
+            <p class="text-[13px] text-sub mt-2">クラウドから安全に読み込み中です</p>
           </div>
         </div>
       `,
 
       syncError: () => `
         <div class="min-h-[70vh] flex items-center justify-center">
-          <div class="w-full max-w-md card-soft rounded-[30px] p-7 text-center">
-            <div class="mx-auto mb-5 w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-2xl">!</div>
-            <p class="text-[10px] font-bold tracking-[0.18em] text-rose-500 mb-2">SYNC ERROR</p>
-            <h1 class="text-xl font-bold text-main mb-3">データを完全に読み込めませんでした</h1>
-            <p class="text-sm text-sub leading-relaxed mb-6">不完全な状態で重複登録しないよう、記録の編集を一時停止しています。通信状態を確認して再試行してください。</p>
+          <div class="w-full max-w-md card-soft rounded-[32px] p-8 text-center">
+            <div class="mx-auto mb-6 w-16 h-16 rounded-[22px] bg-primary-light text-primary flex items-center justify-center"><svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v5m0 3h.01M10.3 4.7 2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.7a2 2 0 0 0-3.4 0Z"/></svg></div>
+            <p class="eyebrow text-primary mb-2">Connection issue</p>
+            <h1 class="text-[22px] font-bold text-main mb-3">記録を読み込めませんでした</h1>
+            <p class="text-sm text-sub leading-7 mb-7">重複登録を防ぐため、編集を一時停止しています。通信状態を確認して再試行してください。</p>
             <button onclick="App.retrySync()" class="btn-primary w-full py-4 rounded-2xl font-bold">同期を再試行</button>
             <button onclick="App.signOutFromSync()" class="w-full mt-3 py-3 rounded-2xl border border-border bg-white text-sm font-bold text-main">別のアカウントでログイン</button>
           </div>
@@ -1279,31 +1323,31 @@ ${pastDataText}
 
         const timelineHtml = timeline.length ? timeline.map((record, index) => {
           const labels = {
-            daily: ['基礎体温', `${record.temperature || '-'} ℃`, 'bg-rose-50 text-rose-600'],
-            clinic: ['通院', record.next_visit_date ? `次回 ${Utils.formatMMDD(record.next_visit_date)}` : '受診記録', 'bg-sky-50 text-sky-600'],
-            iui: [record.actual_date ? '実施記録' : '病院からの予定', record.actual_date ? '実施済み' : '予定', 'bg-indigo-50 text-indigo-600'],
+            daily: ['基礎体温', `${record.temperature || '-'} ℃`, 'bg-primary-light text-primary', '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0ZM11 7v9"/>'],
+            clinic: ['通院', record.next_visit_date ? `次回 ${Utils.formatMMDD(record.next_visit_date)}` : '受診記録', 'bg-wellness-blue-light text-wellness-blue', '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16v13H4V7Zm4 0V4h8v3m-4 3v7m-3.5-3.5h7"/>'],
+            iui: [record.actual_date ? '実施記録' : '病院からの予定', record.actual_date ? '実施済み' : '予定', 'bg-sage-light text-sage', '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm4 9 2 2 4-4"/>'],
           };
-          const [title, value, color] = labels[record.kind];
+          const [title, value, color, iconPath] = labels[record.kind];
           return `
-            <button type="button" onclick="App.openModal('${record.kind}', '${Utils.escapeHtml(record.id)}')" class="relative w-full flex gap-3 text-left pb-4 last:pb-0">
+            <button type="button" onclick="App.openModal('${record.kind}', '${Utils.escapeHtml(record.id)}')" class="relative w-full flex gap-4 text-left pb-5 last:pb-0 group">
               ${index < timeline.length - 1 ? '<span class="timeline-line" aria-hidden="true"></span>' : ''}
-              <span class="relative z-10 w-10 h-10 rounded-2xl ${color} flex items-center justify-center text-[12px] font-black">${record.kind === 'daily' ? '℃' : record.kind === 'clinic' ? '診' : '予'}</span>
+              <span class="relative z-10 w-10 h-10 rounded-[15px] ${color} flex items-center justify-center shadow-[0_6px_18px_rgba(85,70,74,.06)]"><svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">${iconPath}</svg></span>
               <span class="flex-1 min-w-0 pt-0.5">
-                <span class="block text-[13px] font-bold text-main">${title}</span>
-                <span class="block text-[12px] text-sub mt-1">${privateValue(Utils.toLocalYYYYMMDD(record.sortDate).replace(/-/g, '/'))} · ${privateValue(value)}</span>
+                <span class="block text-[14px] font-bold text-main">${title}</span>
+                <span class="block text-[12px] text-sub mt-1.5">${privateValue(Utils.toLocalYYYYMMDD(record.sortDate).replace(/-/g, '/'))} · ${privateValue(value)}</span>
               </span>
-              <span class="text-slate-300 pt-2">›</span>
+              <svg class="w-4 h-4 text-[#c9c3c0] mt-3 transition-transform group-active:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
             </button>
           `;
         }).join('') : '<p class="text-sm text-sub py-4">まだ記録がありません。</p>';
 
         const header = `
-          <header class="flex items-start justify-between gap-4 mb-7">
+          <header class="flex items-start justify-between gap-4 mb-9">
             <div>
               <p class="eyebrow">${today.replace(/-/g, '.')}</p>
-              <h1 class="text-[30px] leading-tight font-bold tracking-tight text-main mt-1">今日のRhythm</h1>
+              <h1 class="text-[34px] leading-tight font-serif font-semibold tracking-[-0.035em] text-main mt-2">今日のRhythm</h1>
             </div>
-            <button onclick="App.togglePrivacy()" class="w-11 h-11 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center text-main" aria-label="${isPrivate ? '数値を表示する' : '数値を隠す'}">
+            <button onclick="App.togglePrivacy()" class="w-11 h-11 rounded-[17px] bg-white/75 shadow-[0_10px_30px_rgba(80,65,70,.08)] flex items-center justify-center text-sub" aria-label="${isPrivate ? '数値を表示する' : '数値を隠す'}">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${isPrivate ? 'M3 3l18 18M10.7 10.7a2 2 0 0 0 2.6 2.6M9.9 4.2A10.7 10.7 0 0 1 21 12a11.8 11.8 0 0 1-2.1 3.1M6.6 6.6A11.5 11.5 0 0 0 3 12a10.8 10.8 0 0 0 8.3 7.7' : 'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Zm9.5 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z'}"/></svg>
             </button>
           </header>
@@ -1311,9 +1355,9 @@ ${pastDataText}
 
         if (!activeCycle) {
           return header + `
-            <section class="card-soft rounded-[30px] p-7">
-              <span class="status-chip bg-slate-100 text-slate-700 mb-5">はじめに</span>
-              <h2 class="text-2xl font-bold text-main">周期を登録すると始められます</h2>
+            <section class="card-soft rounded-[34px] p-8">
+              <span class="status-chip bg-primary-light text-primary mb-6">はじめに</span>
+              <h2 class="text-[25px] font-serif font-semibold text-main">周期を登録すると始められます</h2>
               <p class="text-sm text-sub leading-7 mt-3 mb-6">生理開始日を基準に、体温・通院・予定をひとつの流れで整理します。</p>
               <button onclick="App.openModal('new-cycle')" class="btn-primary w-full py-4 rounded-2xl font-bold">最初の周期を登録</button>
             </section>
@@ -1334,55 +1378,55 @@ ${pastDataText}
         ].sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
 
         return header + `
-          <section class="hero-card rounded-[32px] p-6 mb-5 overflow-hidden relative">
-            <div class="absolute -right-16 -top-20 w-52 h-52 rounded-full bg-white/[0.06]"></div>
+          <section class="hero-card rounded-[36px] p-7 mb-6 overflow-hidden relative">
+            <div class="absolute -right-16 -top-20 w-52 h-52 rounded-full bg-white/30 blur-2xl"></div>
             <div class="relative">
               <div class="flex items-center justify-between gap-3">
-                <span class="status-chip bg-white/10 border border-white/15 text-white">${privateValue(activeCycle.type || '周期タイプ未設定')}</span>
-                <button onclick="App.openModal('new-cycle', '${Utils.escapeHtml(activeCycle.id)}')" class="text-[12px] font-bold text-white/70 py-2 px-3">編集</button>
+                <span class="status-chip bg-white/55 text-[#8d6170]">${privateValue(activeCycle.type || '周期タイプ未設定')}</span>
+                <button onclick="App.openModal('new-cycle', '${Utils.escapeHtml(activeCycle.id)}')" class="w-10 h-10 rounded-full bg-white/50 text-sub flex items-center justify-center" aria-label="周期を編集"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m14 5 5 5M4 20l3.5-.8L19 7.7 16.3 5 4.8 16.5 4 20Z"/></svg></button>
               </div>
               <div class="mt-7">
-                <p class="text-white/60 text-sm">現在の周期</p>
+                <p class="text-sub text-[13px] font-medium">現在の周期</p>
                 <div class="flex items-end gap-2 mt-1">
-                  <strong class="text-5xl tracking-tight">${privateValue(cycleDay)}</strong>
-                  <span class="text-white/70 font-bold pb-1.5">日目</span>
+                  <strong class="text-[58px] leading-none font-serif font-medium tracking-[-0.055em]">${privateValue(cycleDay)}</strong>
+                  <span class="text-sub font-bold pb-1.5">日目</span>
                 </div>
               </div>
               <div class="mt-7">
-                <div class="flex justify-between text-[12px] text-white/70 mb-2"><span>今周期の体温記録</span><span>${privateValue(`${measuredDays}/${expectedDays}日`)}</span></div>
-                <div class="h-2 rounded-full bg-white/15 overflow-hidden"><div class="h-full rounded-full bg-cyan-300" style="width:${progress}%"></div></div>
+                <div class="flex justify-between text-[12px] text-sub mb-2.5"><span>今周期の体温記録</span><span>${privateValue(`${measuredDays}/${expectedDays}日`)}</span></div>
+                <div class="h-2 rounded-full bg-white/60 overflow-hidden"><div class="h-full rounded-full bg-gradient-to-r from-primary to-sage" style="width:${progress}%"></div></div>
               </div>
             </div>
           </section>
 
-          <section class="card-soft rounded-[28px] p-5 mb-5">
+          <section class="card-soft rounded-[32px] p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
               <div><p class="eyebrow">Today</p><h2 class="text-xl font-bold mt-1">今日やること</h2></div>
               <span class="status-chip ${todayRecord ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${todayRecord ? '記録済み' : '未記録'}</span>
             </div>
-            <button onclick="App.openModal('daily', '${todayRecord ? Utils.escapeHtml(todayRecord.id) : ''}', '${today}')" class="w-full rounded-[22px] ${todayRecord ? 'bg-emerald-50/70 border-emerald-100' : 'bg-slate-900 border-slate-900 text-white'} border p-4 flex items-center gap-4 text-left">
-              <span class="w-11 h-11 rounded-2xl ${todayRecord ? 'bg-white text-emerald-600' : 'bg-white/10 text-white'} flex items-center justify-center font-black">℃</span>
+            <button onclick="App.openModal('daily', '${todayRecord ? Utils.escapeHtml(todayRecord.id) : ''}', '${today}')" class="w-full rounded-[24px] ${todayRecord ? 'bg-sage-light/80 text-main' : 'bg-gradient-to-br from-[#e28a9d] to-[#cf7187] text-white'} p-5 flex items-center gap-4 text-left shadow-[0_14px_32px_rgba(198,103,126,.15)]">
+              <span class="w-12 h-12 rounded-[18px] ${todayRecord ? 'bg-white/80 text-sage' : 'bg-white/16 text-white'} flex items-center justify-center"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0ZM11 7v9"/></svg></span>
               <span class="flex-1">
                 <span class="block font-bold">${todayRecord ? '今日の体温を確認・編集' : '今日の基礎体温を記録'}</span>
                 <span class="block text-[12px] mt-1 ${todayRecord ? 'text-emerald-700/70' : 'text-white/60'}">${todayRecord ? `${privateValue(`${todayRecord.temperature} ℃`)} を保存済み` : '日々の変化をあとから振り返れます'}</span>
               </span>
-              <span class="${todayRecord ? 'text-emerald-300' : 'text-white/40'} text-xl">›</span>
+              <svg class="w-5 h-5 ${todayRecord ? 'text-sage' : 'text-white/50'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
             </button>
           </section>
 
-          <section class="card-soft rounded-[28px] p-5 mb-5">
+          <section class="card-soft rounded-[32px] p-6 mb-6">
             <p class="eyebrow mb-1">Next</p>
             <h2 class="text-xl font-bold mb-4">次の確定予定</h2>
             ${nextConfirmed ? `
-              <button onclick="${nextConfirmed.action}" class="w-full text-left rounded-[20px] border border-sky-100 bg-sky-50/70 p-4 flex items-center gap-4">
-                <span class="w-12 h-12 rounded-2xl bg-white text-sky-600 flex items-center justify-center font-black">予</span>
+              <button onclick="${nextConfirmed.action}" class="w-full text-left rounded-[24px] bg-wellness-blue-light/80 p-5 flex items-center gap-4">
+                <span class="w-12 h-12 rounded-[18px] bg-white/80 text-wellness-blue flex items-center justify-center"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 9h8"/></svg></span>
                 <span class="flex-1"><span class="block text-[12px] font-bold text-sky-700">${nextConfirmed.source}</span><span class="block text-lg font-bold text-main mt-1">${privateValue(nextConfirmed.label)} · ${privateValue(Utils.formatMMDD(nextConfirmed.date))}</span></span>
-                <span class="text-sky-300">›</span>
+                <svg class="w-5 h-5 text-wellness-blue/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
               </button>
             ` : `<div class="rounded-[20px] bg-slate-50 p-5 text-sm text-sub">確定した予定はありません。中央の＋から通院や${eventLabel}予定を追加できます。</div>`}
           </section>
 
-          <section class="card-soft rounded-[28px] p-5 mb-5">
+          <section class="card-soft rounded-[32px] p-6 mb-6">
             <div class="flex items-end justify-between mb-5">
               <div><p class="eyebrow">Recent</p><h2 class="text-xl font-bold mt-1">最近の記録</h2></div>
               <button onclick="App.navigate('records')" class="text-[12px] font-bold text-sub px-2 py-2">すべて見る</button>
@@ -1390,10 +1434,10 @@ ${pastDataText}
             <div>${timelineHtml}</div>
           </section>
 
-          <details class="forecast-card rounded-[24px] p-5 mb-5">
+          <details class="forecast-card rounded-[30px] p-6 mb-6 group">
             <summary class="cursor-pointer list-none flex items-center justify-between gap-3">
               <div><span class="status-chip bg-white text-slate-600 border border-border mb-2">参考予測</span><h2 class="text-base font-bold">今周期の見通し</h2></div>
-              <span class="text-slate-400">＋</span>
+              <svg class="w-5 h-5 text-sub transition-transform group-open:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="1.8" d="M12 5v14M5 12h14"/></svg>
             </summary>
             <div class="grid grid-cols-2 gap-3 mt-5">
               <div class="bg-white rounded-2xl p-4 border border-border"><p class="text-[12px] text-sub">${eventLabel}目安</p><p class="text-lg font-bold mt-1">${privateValue(predictions.iui ? Utils.formatMMDD(predictions.iui) : '-')}</p></div>
@@ -1438,43 +1482,43 @@ ${pastDataText}
           
           const evType = App.getCycleTypeForDate(dStr);
           const isTimingEv = evType === 'タイミング周期' || evType === '自然周期';
-          const mainIcon = isTimingEv ? '💕' : '📌';
-          const preIcon = isTimingEv ? '💓' : '❌';
+          const mainDot = isTimingEv ? 'bg-primary' : 'bg-wellness-blue';
+          const preDot = isTimingEv ? 'bg-[#e8a6b5]' : 'bg-[#a9a3a0]';
           
           let eventsHtml = '';
           const eventNames = [];
           if (iuiDates.includes(dStr)) {
-            eventsHtml += `<span class="text-[10px]">${mainIcon}</span>`;
+            eventsHtml += `<span class="w-1.5 h-1.5 rounded-full ${mainDot}"></span>`;
             eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}実施日`);
           } else if (dStr === preds.iui && !preds.isPredictedIUI) {
-            eventsHtml += `<span class="text-[10px]">${mainIcon}</span>`;
+            eventsHtml += `<span class="w-1.5 h-1.5 rounded-full ${mainDot}"></span>`;
             eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}予定日`);
           } else if (dStr === preds.iui && preds.isPredictedIUI) {
-            eventsHtml += `<span class="text-[10px] opacity-40">${mainIcon}</span>`;
+            eventsHtml += `<span class="w-1.5 h-1.5 rounded-full ${mainDot} opacity-35"></span>`;
             eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}予測日`);
           } else if (futureIuis.includes(dStr)) {
-            eventsHtml += `<span class="text-[10px] opacity-40">${mainIcon}</span>`;
+            eventsHtml += `<span class="w-1.5 h-1.5 rounded-full ${mainDot} opacity-35"></span>`;
             eventNames.push(`${isTimingEv ? 'タイミング' : 'IUI'}予測日`);
           }
           
           if (cycleStarts.includes(dStr)) {
-            eventsHtml += '<span class="text-[10px]">🩸</span>';
+            eventsHtml += '<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>';
             eventNames.push('生理開始日');
           } else if (dStr === preds.period) {
-            eventsHtml += `<span class="text-[10px]">${preds.isAIPeriod ? '✨' : '🩸'}</span>`;
+            eventsHtml += `<span class="w-1.5 h-1.5 rounded-full ${preds.isAIPeriod ? 'bg-lilac' : 'bg-primary'}"></span>`;
             eventNames.push(preds.isAIPeriod ? 'AIによる次回生理予測日' : '次回生理予定日');
           } else if (futurePeriods.includes(dStr)) {
-            eventsHtml += '<span class="text-[10px] opacity-40">🩸</span>';
+            eventsHtml += '<span class="w-1.5 h-1.5 rounded-full bg-primary opacity-35"></span>';
             eventNames.push('生理予測日');
           }
           
           if (aiOvulationDates.includes(dStr)) {
-             eventsHtml += '<span class="text-[10px]">🥚</span>';
+             eventsHtml += '<span class="w-1.5 h-1.5 rounded-full bg-sage"></span>';
              eventNames.push('AIによる排卵予測日');
           }
 
           if (isAbstain) {
-            eventsHtml += `<span class="text-[10px]">${preIcon}</span>`;
+            eventsHtml += `<span class="w-1.5 h-1.5 rounded-full ${preDot}"></span>`;
             eventNames.push(isTimingEv ? 'タイミング推奨期間' : '禁欲期間');
           }
 
@@ -1493,35 +1537,34 @@ ${pastDataText}
 
           const accessibleEvents = eventNames.length ? eventNames.join('、') : '予定なし';
           cells += `
-            <button type="button" class="aspect-square flex flex-col items-center pt-1 rounded-xl relative active:bg-gray-100 transition-colors ${bgClass} ${borderClass}"
+            <button type="button" class="aspect-square flex flex-col items-center justify-center rounded-[14px] relative active:scale-95 transition-all ${bgClass} ${borderClass}"
                  onclick="App.selectDate('${dStr}')" id="cal-cell-${dStr}" aria-pressed="false" aria-label="${month + 1}月${i}日、${accessibleEvents}${hasRec ? '、記録あり' : ''}">
-              <span class="text-[14px] ${textClass} leading-none mb-0.5">${i}</span>
-              <div class="flex flex-wrap justify-center gap-[1px] leading-none px-0.5">${eventsHtml}</div>
-              ${hasRec ? `<div class="w-1 h-1 bg-primary rounded-full absolute bottom-1"></div>` : ''}
+              <span class="text-[14px] ${textClass} leading-none">${i}</span>
+              <div class="flex justify-center gap-[3px] mt-1.5 h-1.5">${eventsHtml}</div>
+              ${hasRec ? `<div class="w-1 h-1 bg-main rounded-full absolute top-1.5 right-1.5"></div>` : ''}
             </button>
           `;
         }
 
         return `
-          <div class="mb-6">
-            <p class="text-[10px] font-bold tracking-[0.18em] text-sub mb-1">SCHEDULE</p>
-            <h1 class="text-3xl font-serif tracking-wider text-main font-bold">予定</h1>
-            <p class="text-xs text-sub mt-2">予測と記録を日付ごとに確認できます</p>
+          <div class="mb-8">
+            <p class="eyebrow mb-2">Calendar</p>
+            <h1 class="text-[34px] font-serif font-semibold tracking-[-0.035em] text-main">予定</h1>
+            <p class="text-sm text-sub mt-2">記録と予定を、ひと月の流れで確認</p>
           </div>
-          <div class="card-soft rounded-[28px] p-5">
-            <div class="flex justify-between items-center mb-4 px-2">
-              <button onclick="App.changeMonth(-1)" class="w-11 h-11 rounded-full flex items-center justify-center text-xl text-sub hover:text-main hover:bg-slate-100 transition-colors" aria-label="前の月">‹</button>
+          <div class="card-soft rounded-[34px] p-5 sm:p-6">
+            <div class="flex justify-between items-center mb-6">
+              <button onclick="App.changeMonth(-1)" class="w-10 h-10 rounded-full flex items-center justify-center text-sub bg-white/70" aria-label="前の月"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="m15 5-7 7 7 7"/></svg></button>
               <div class="flex items-center gap-3">
-                <div class="font-bold text-lg">${year}年${month + 1}月</div>
-                <button onclick="App.goToday()" class="text-[11px] bg-slate-100 text-main px-2.5 py-1 rounded shadow-sm active:bg-slate-200 font-bold transition-colors">今日</button>
+                <div class="font-serif font-semibold text-[21px]">${year}年${month + 1}月</div>
+                <button onclick="App.goToday()" class="text-[11px] bg-primary-light text-primary px-3 py-1.5 rounded-full font-bold">今日</button>
               </div>
-              <button onclick="App.changeMonth(1)" class="w-11 h-11 rounded-full flex items-center justify-center text-xl text-sub hover:text-main hover:bg-slate-100 transition-colors" aria-label="次の月">›</button>
+              <button onclick="App.changeMonth(1)" class="w-10 h-10 rounded-full flex items-center justify-center text-sub bg-white/70" aria-label="次の月"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg></button>
             </div>
-            <div class="flex flex-wrap gap-x-3 gap-y-1.5 mb-4 px-2 text-[10px] text-sub" aria-label="カレンダーの凡例">
-              <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-primary"></span>記録あり</span>
-              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-rose-100 border border-rose-200"></span>生理</span>
-              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-100 border border-blue-200"></span>IUI・タイミング</span>
-              <span class="flex items-center gap-1.5"><span class="opacity-50 font-bold">予</span>予測</span>
+            <div class="flex flex-wrap gap-x-4 gap-y-2 mb-5 px-1 text-[11px] text-sub" aria-label="カレンダーの凡例">
+              <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>生理</span>
+              <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-wellness-blue"></span>IUI・予定</span>
+              <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sage"></span>AI推測</span>
             </div>
             <div class="grid grid-cols-7 text-center mb-2 text-xs font-bold text-sub">
               <div class="text-rose-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
@@ -1591,10 +1634,10 @@ ${pastDataText}
         const minTemperature = temperatureRows.length ? Math.min(...temperatureRows.map(record => record.value)) : null;
         const maxTemperature = temperatureRows.length ? Math.max(...temperatureRows.map(record => record.value)) : null;
         const temperatureSummaryHtml = latestTemperature ? `
-          <div class="grid grid-cols-3 gap-2 mt-4" aria-label="基礎体温の要約">
-            <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] text-sub mb-1">直近</div><div class="text-sm font-bold">${latestTemperature.value.toFixed(2)}℃</div></div>
-            <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] text-sub mb-1">最低</div><div class="text-sm font-bold">${minTemperature.toFixed(2)}℃</div></div>
-            <div class="bg-slate-50 rounded-xl p-3"><div class="text-[10px] text-sub mb-1">最高</div><div class="text-sm font-bold">${maxTemperature.toFixed(2)}℃</div></div>
+          <div class="grid grid-cols-3 gap-2.5 mt-5" aria-label="基礎体温の要約">
+            <div class="bg-primary-light/70 rounded-[18px] p-3.5"><div class="text-[10px] text-sub mb-1.5">直近</div><div class="text-[15px] font-semibold font-serif">${latestTemperature.value.toFixed(2)}℃</div></div>
+            <div class="bg-wellness-blue-light/70 rounded-[18px] p-3.5"><div class="text-[10px] text-sub mb-1.5">最低</div><div class="text-[15px] font-semibold font-serif">${minTemperature.toFixed(2)}℃</div></div>
+            <div class="bg-sage-light/70 rounded-[18px] p-3.5"><div class="text-[10px] text-sub mb-1.5">最高</div><div class="text-[15px] font-semibold font-serif">${maxTemperature.toFixed(2)}℃</div></div>
           </div>
           <details class="mt-3">
             <summary class="text-[11px] font-bold text-sub cursor-pointer py-2">日付ごとの数値を見る</summary>
@@ -1615,22 +1658,26 @@ ${pastDataText}
         all.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         let listHtml = all.map(r => {
-          const detail = r.type === 'daily'
-            ? `🌡 体温: <span class="font-medium text-main">${r.temperature || '-'}</span>°C`
+          const typeMeta = r.type === 'daily'
+            ? { detail: `体温 <span class="font-semibold text-main">${r.temperature || '-'}</span>°C`, color: 'bg-primary-light text-primary', icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0ZM11 7v9"/>' }
             : r.type === 'clinic'
-              ? '🏥 通院記録'
-              : `${isTiming ? '💕' : '📌'} ${eventLabel}${r.actual_date ? '実施済み' : '予定'}`;
+              ? { detail: '通院記録', color: 'bg-wellness-blue-light text-wellness-blue', icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16v13H4V7Zm4 0V4h8v3m-4 3v7m-3.5-3.5h7"/>' }
+              : { detail: `${eventLabel}${r.actual_date ? '実施済み' : '予定'}`, color: 'bg-sage-light text-sage', icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm4 5 2 2 4-4"/>' };
           return `
-          <button type="button" class="card-soft w-full rounded-[20px] p-4 mb-3 flex justify-between items-center text-left active:scale-[0.99] transition-transform"
+          <button type="button" class="relative w-full pl-14 pb-6 flex text-left group"
                onclick="App.openModal('${r.type}', '${r.id}')">
-            <div>
-              <div class="font-bold text-[15px] mb-1 text-main flex items-center gap-1">
+            <span class="absolute left-[19px] top-10 bottom-0 w-px bg-gradient-to-b from-[#e6d6d9] to-transparent"></span>
+            <span class="absolute left-0 top-0 w-10 h-10 rounded-[15px] ${typeMeta.color} flex items-center justify-center shadow-[0_7px_20px_rgba(80,65,70,.06)]"><svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">${typeMeta.icon}</svg></span>
+            <div class="card-soft rounded-[24px] px-5 py-4 flex-1 flex items-center justify-between">
+              <div>
+              <div class="font-bold text-[14px] mb-1.5 text-main flex items-center gap-1">
                 ${Utils.toLocalYYYYMMDD(r.date)}
-                ${r.memo ? '<span class="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded ml-1 font-bold">メモあり</span>' : ''}
+                ${r.memo ? '<span class="text-[10px] bg-lilac-light text-lilac px-2 py-0.5 rounded-full ml-1 font-bold">メモあり</span>' : ''}
               </div>
-              <div class="text-[13px] text-sub">${detail}</div>
+              <div class="text-[13px] text-sub">${typeMeta.detail}</div>
+              </div>
+              <svg class="w-4 h-4 text-[#c9c3c0]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
             </div>
-            <div class="text-slate-300 text-xl">›</div>
           </button>
         `;
         }).join('');
@@ -1643,9 +1690,9 @@ ${pastDataText}
         
         if (targetAiPred) {
           aiHtml = `
-            <details class="group bg-gradient-to-br from-slate-100 to-blue-50 rounded-[20px] shadow-sm border border-blue-100 mb-6">
+            <details class="group card-soft rounded-[30px] mb-7 overflow-hidden">
               <summary class="flex justify-between items-center p-5 cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none">
-                <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2"><span class="text-lg">✨</span> AIデータ分析</h2>
+                <h2 class="text-sm font-bold text-main flex items-center gap-3"><span class="w-9 h-9 rounded-[14px] bg-lilac-light text-lilac flex items-center justify-center"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m12 3 1.2 4.2L17 9l-3.8 1.8L12 15l-1.2-4.2L7 9l3.8-1.8L12 3Zm6 11 .7 2.3L21 17l-2.3.7L18 20l-.7-2.3L15 17l2.3-.7L18 14Z"/></svg></span>AIからのインサイト</h2>
                 <svg class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
               </summary>
               <div class="px-5 pb-5 border-t border-blue-100/50 pt-4 mt-1">
@@ -1661,7 +1708,7 @@ ${pastDataText}
                   <textarea id="ai-memo-input-record" class="form-control w-full bg-white border border-blue-100 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-blue-300" rows="2" placeholder="例: 排卵検査薬が陽性になった、薬を飲んでいる等" onchange="App.updateAiMemo('${targetCycleId}', this.value)">${Utils.escapeHtml(savedAiMemo)}</textarea>
                 </div>
                 <div class="text-[12px] text-slate-700 leading-relaxed bg-white/50 p-3.5 rounded-xl border border-blue-100/50">
-                  <span class="font-bold mb-1 block text-slate-800">💡 AIからのコメント</span>
+                  <span class="font-bold mb-1 block text-slate-800">分析コメント</span>
                   ${Utils.escapeHtml(targetAiPred.reason)}
                 </div>
               </div>
@@ -1669,9 +1716,9 @@ ${pastDataText}
           `;
         } else if (cycleDaily.length >= 5) {
           aiHtml = `
-            <details class="group bg-gradient-to-br from-slate-100 to-blue-50 rounded-[20px] shadow-sm border border-blue-100 mb-6">
+            <details class="group card-soft rounded-[30px] mb-7 overflow-hidden">
               <summary class="flex justify-between items-center p-5 cursor-pointer list-none [&::-webkit-details-marker]:hidden outline-none select-none">
-                <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2"><span class="text-lg">✨</span> AIデータ分析</h2>
+                <h2 class="text-sm font-bold text-main flex items-center gap-3"><span class="w-9 h-9 rounded-[14px] bg-lilac-light text-lilac flex items-center justify-center"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m12 3 1.2 4.2L17 9l-3.8 1.8L12 15l-1.2-4.2L7 9l3.8-1.8L12 3Z"/></svg></span>AIからのインサイト</h2>
                 <svg class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
               </summary>
               <div class="px-5 pb-5 border-t border-blue-100/50 pt-4 mt-1">
@@ -1687,17 +1734,17 @@ ${pastDataText}
         }
 
         return `
-          <div class="mb-6">
+          <div class="mb-8">
             <p class="eyebrow">Review</p>
-            <h1 class="text-3xl tracking-tight text-main font-bold mt-1">振り返り</h1>
+            <h1 class="text-[34px] font-serif font-semibold tracking-[-0.035em] text-main mt-2">振り返り</h1>
             <p class="text-sm text-sub mt-2">実測データと通院履歴を周期ごとに確認します</p>
           </div>
           
           ${cycleSelectorHtml}
 
-          <div class="card-soft rounded-[28px] p-5 mb-6">
+          <div class="card-soft rounded-[34px] p-6 mb-7">
             <div class="flex justify-between items-center mb-3">
-              <h2 class="text-sm font-bold text-main">基礎体温グラフ</h2>
+              <div><p class="eyebrow">Temperature</p><h2 class="text-[19px] font-bold text-main mt-1">基礎体温グラフ</h2></div>
             </div>
             
             <div class="flex flex-wrap gap-3 justify-center mb-4 text-[10px] text-sub">
@@ -1706,7 +1753,7 @@ ${pastDataText}
               <div class="flex items-center gap-1.5"><span class="w-4 h-[2px] border-b-2 border-dashed border-rose-400 opacity-60"></span>基準線(${Number(baseTemp).toFixed(2)}℃)</div>
             </div>
             
-            <div class="w-full h-[200px] relative flex justify-center items-center">
+            <div class="w-full h-[240px] relative flex justify-center items-center rounded-[24px] bg-gradient-to-b from-white/55 to-transparent mt-3 px-1 py-3">
               <canvas id="tempChart" class="z-10 absolute inset-0" role="img" aria-label="選択中の周期の基礎体温グラフ"></canvas>
               <div id="tempChart-empty" class="text-sub text-xs hidden z-0">体温データがありません</div>
             </div>
@@ -1715,7 +1762,7 @@ ${pastDataText}
           
           ${aiHtml}
 
-          <h2 class="text-sm font-bold text-main mb-3 ml-1">この周期の記録</h2>
+          <div class="flex items-center justify-between mb-5"><div><p class="eyebrow">Timeline</p><h2 class="text-[19px] font-bold text-main mt-1">この周期の記録</h2></div><span class="text-[12px] text-sub">${all.length}件</span></div>
           <div class="pb-4">${listHtml}</div>
         `;
       },
@@ -1783,33 +1830,33 @@ ${pastDataText}
           : `<p class="text-[10px] text-sub mt-2">※過去の周期データが蓄積されると算出されます</p>`;
 
         return `
-          <div class="mb-6">
+          <div class="mb-8">
             <p class="eyebrow">More</p>
-            <h1 class="text-3xl tracking-tight text-main font-bold mt-1">その他</h1>
+            <h1 class="text-[34px] font-serif font-semibold tracking-[-0.035em] text-main mt-2">その他</h1>
             <p class="text-sm text-sub mt-2">周期、表示、データ、同期を管理します</p>
           </div>
 
-          <h2 class="text-sm font-bold text-main mb-3 ml-1">管理</h2>
-          <div class="card-soft rounded-[28px] p-2 mb-6">
-            <button onclick="App.navigate('cycles')" class="w-full p-4 flex items-center gap-4 text-left rounded-[20px] active:bg-slate-50">
-              <span class="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-black">周</span>
-              <span class="flex-1"><span class="block font-bold text-main">周期の管理</span><span class="block text-[12px] text-sub mt-1">開始日・治療タイプ・状態を編集</span></span><span class="text-slate-300">›</span>
+          <p class="eyebrow mb-3 ml-1">Management</p>
+          <div class="card-soft rounded-[30px] p-2 mb-7">
+            <button onclick="App.navigate('cycles')" class="w-full p-4 flex items-center gap-4 text-left rounded-[22px] active:bg-white/55">
+              <span class="w-11 h-11 rounded-[16px] bg-primary-light text-primary flex items-center justify-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7h-5V2M4 17h5v5m10-8a7 7 0 0 1-12 4l-3-3m1-5A7 7 0 0 1 17 6l3 3"/></svg></span>
+              <span class="flex-1"><span class="block text-[14px] font-bold text-main">周期の管理</span><span class="block text-[12px] text-sub mt-1">開始日・治療タイプ・状態を編集</span></span><svg class="w-4 h-4 text-[#c9c3c0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
             </button>
             <div class="h-px bg-border mx-4"></div>
-            <button onclick="App.togglePrivacy()" class="w-full p-4 flex items-center gap-4 text-left rounded-[20px] active:bg-slate-50">
-              <span class="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-black">秘</span>
-              <span class="flex-1"><span class="block font-bold text-main">プライバシー表示</span><span class="block text-[12px] text-sub mt-1">ホームの数値を${settings.privacyMode ? '隠しています' : '表示しています'}</span></span>
-              <span class="status-chip ${settings.privacyMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-sub'}">${settings.privacyMode ? 'ON' : 'OFF'}</span>
+            <button onclick="App.togglePrivacy()" class="w-full p-4 flex items-center gap-4 text-left rounded-[22px] active:bg-white/55">
+              <span class="w-11 h-11 rounded-[16px] bg-lilac-light text-lilac flex items-center justify-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Zm9.5 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg></span>
+              <span class="flex-1"><span class="block text-[14px] font-bold text-main">プライバシー表示</span><span class="block text-[12px] text-sub mt-1">ホームの数値を${settings.privacyMode ? '隠しています' : '表示しています'}</span></span>
+              <span class="status-chip ${settings.privacyMode ? 'bg-primary text-white' : 'bg-[#f0edeb] text-sub'}">${settings.privacyMode ? 'ON' : 'OFF'}</span>
             </button>
             <div class="h-px bg-border mx-4"></div>
-            <button onclick="App.exportData()" class="w-full p-4 flex items-center gap-4 text-left rounded-[20px] active:bg-slate-50">
-              <span class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">出</span>
-              <span class="flex-1"><span class="block font-bold text-main">データを書き出す</span><span class="block text-[12px] text-sub mt-1">全記録をJSON形式で端末へ保存</span></span><span class="text-slate-300">›</span>
+            <button onclick="App.exportData()" class="w-full p-4 flex items-center gap-4 text-left rounded-[22px] active:bg-white/55">
+              <span class="w-11 h-11 rounded-[16px] bg-sage-light text-sage flex items-center justify-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg></span>
+              <span class="flex-1"><span class="block text-[14px] font-bold text-main">データを書き出す</span><span class="block text-[12px] text-sub mt-1">全記録をJSON形式で端末へ保存</span></span><svg class="w-4 h-4 text-[#c9c3c0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
             </button>
           </div>
           
-          <h2 class="text-sm font-bold text-main mb-3 ml-1">周期設定</h2>
-          <div class="card-soft rounded-[28px] p-5 mb-6">
+          <p class="eyebrow mb-3 ml-1">Cycle preferences</p>
+          <div class="card-soft rounded-[30px] p-6 mb-7">
             <div class="mb-5">
               <label for="set-cycle-len" class="block text-[13px] text-main mb-2">平均周期日数</label>
               <div class="flex items-center gap-2">
@@ -1846,8 +1893,8 @@ ${pastDataText}
             </div>
           </div>
 
-          <h2 class="text-sm font-bold text-slate-800 mb-3 ml-1 mt-8 flex items-center gap-1"><span class="text-lg leading-none">✨</span> AI設定</h2>
-          <div class="bg-gradient-to-br from-slate-100 to-blue-50 rounded-[20px] p-5 shadow-sm border border-blue-100 mb-6">
+          <p class="eyebrow mb-3 ml-1 mt-8">AI insight</p>
+          <div class="card-soft rounded-[30px] p-6 mb-7">
             <div>
               <label for="set-api-key" class="block text-[13px] text-slate-800 mb-2 font-bold">Gemini APIキー</label>
               <input type="password" id="set-api-key" class="form-control w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-[15px] outline-none" value="${Utils.escapeHtml(apiKey)}" placeholder="AIzaSy..." onchange="App.updateApiKey(this.value)">
@@ -1857,8 +1904,8 @@ ${pastDataText}
             </div>
           </div>
 
-          <h2 class="text-sm font-bold text-main mb-3 ml-1 mt-8">Firebase同期</h2>
-          <div class="card-soft rounded-[28px] p-5 mb-6">
+          <p class="eyebrow mb-3 ml-1 mt-8">Cloud sync</p>
+          <div class="card-soft rounded-[30px] p-6 mb-7">
             <div class="flex items-center justify-between mb-4">
               <div>
                 <div class="text-[13px] font-bold text-main">Firebaseアカウント</div>
@@ -1899,23 +1946,23 @@ ${pastDataText}
         `;
       },
       'quick-add': () => `
-        <p class="text-sm text-sub leading-6 mb-5">追加したい記録を選んでください。入力済みの日付を選ぶと、その記録を編集できます。</p>
+        <p class="text-sm text-sub leading-7 mb-6">今日残したい記録を選んでください。保存済みの日付は、そのまま編集できます。</p>
         <div class="grid grid-cols-2 gap-3">
-          <button onclick="App.openModal('daily')" class="col-span-2 rounded-[22px] bg-slate-900 text-white p-5 flex items-center gap-4 text-left">
-            <span class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-xl font-black">℃</span>
-            <span class="flex-1"><span class="block text-base font-bold">基礎体温</span><span class="block text-[12px] text-white/60 mt-1">今日の測定値をすばやく記録</span></span><span class="text-white/40">›</span>
+          <button onclick="App.openModal('daily')" class="col-span-2 rounded-[26px] bg-gradient-to-br from-[#e28a9d] to-[#cf7187] text-white p-5 flex items-center gap-4 text-left shadow-[0_16px_34px_rgba(198,103,126,.2)]">
+            <span class="w-12 h-12 rounded-[18px] bg-white/15 flex items-center justify-center"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0ZM11 7v9"/></svg></span>
+            <span class="flex-1"><span class="block text-base font-bold">基礎体温</span><span class="block text-[12px] text-white/70 mt-1">今日の測定値をすばやく記録</span></span><svg class="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
           </button>
-          <button onclick="App.openModal('clinic')" class="rounded-[22px] bg-sky-50 border border-sky-100 p-4 text-left">
-            <span class="w-10 h-10 rounded-2xl bg-white text-sky-700 flex items-center justify-center font-black mb-4">診</span>
+          <button onclick="App.openModal('clinic')" class="rounded-[26px] bg-wellness-blue-light p-5 text-left">
+            <span class="w-11 h-11 rounded-[16px] bg-white/80 text-wellness-blue flex items-center justify-center mb-5"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 7h16v13H4V7Zm4 0V4h8v3m-4 3v7m-3.5-3.5h7"/></svg></span>
             <span class="block text-sm font-bold text-main">通院</span><span class="block text-[11px] text-sub mt-1">受診・次回予定</span>
           </button>
-          <button onclick="App.openModal('iui')" class="rounded-[22px] bg-indigo-50 border border-indigo-100 p-4 text-left">
-            <span class="w-10 h-10 rounded-2xl bg-white text-indigo-700 flex items-center justify-center font-black mb-4">予</span>
+          <button onclick="App.openModal('iui')" class="rounded-[26px] bg-sage-light p-5 text-left">
+            <span class="w-11 h-11 rounded-[16px] bg-white/80 text-sage flex items-center justify-center mb-5"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg></span>
             <span class="block text-sm font-bold text-main">IUI・タイミング</span><span class="block text-[11px] text-sub mt-1">予定・実施結果</span>
           </button>
-          <button onclick="App.openModal('new-cycle')" class="col-span-2 rounded-[22px] bg-white border border-border p-4 flex items-center gap-4 text-left">
-            <span class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center font-black">周</span>
-            <span class="flex-1"><span class="block text-sm font-bold text-main">新しい周期</span><span class="block text-[11px] text-sub mt-1">生理開始日と周期タイプを登録</span></span><span class="text-slate-300">›</span>
+          <button onclick="App.openModal('new-cycle')" class="col-span-2 rounded-[24px] bg-white/75 p-4 flex items-center gap-4 text-left shadow-[0_10px_30px_rgba(80,65,70,.05)]">
+            <span class="w-11 h-11 rounded-[16px] bg-primary-light text-primary flex items-center justify-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7h-5V2M4 17h5v5m10-8a7 7 0 0 1-12 4l-3-3m1-5A7 7 0 0 1 17 6l3 3"/></svg></span>
+            <span class="flex-1"><span class="block text-sm font-bold text-main">新しい周期</span><span class="block text-[11px] text-sub mt-1">生理開始日と周期タイプを登録</span></span><svg class="w-4 h-4 text-[#c9c3c0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
           </button>
         </div>
       `,
@@ -1923,9 +1970,10 @@ ${pastDataText}
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().daily.find(x => x.id === id) || {};
         return `
-          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
-            <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">BASAL TEMPERATURE</p>
-            <p class="text-sm text-main leading-relaxed">日付と体温を入力します。同じ日付の記録がある場合は上書きします。</p>
+          <div class="mb-6 p-5 rounded-[24px] bg-primary-light/65">
+            <div class="w-10 h-10 rounded-[15px] bg-white/80 text-primary flex items-center justify-center mb-4"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0ZM11 7v9"/></svg></div>
+            <p class="text-[11px] font-bold tracking-[0.14em] text-primary mb-1.5">BASAL TEMPERATURE</p>
+            <p class="text-sm text-main/80 leading-6">日付と体温を入力します。同じ日付の記録がある場合は上書きします。</p>
           </div>
           <div id="form-existing-note" class="${r.id ? '' : 'hidden'} mb-4 rounded-xl bg-sky-50 border border-sky-100 px-3.5 py-3 text-[12px] font-bold text-sky-700">この日の記録を編集中です</div>
           <div class="mb-5">
@@ -1936,7 +1984,7 @@ ${pastDataText}
           <div class="mb-5">
             <label class="field-label" for="form-temp">基礎体温 <span class="field-required">必須</span></label>
             <div class="relative">
-              <input type="number" id="form-temp" class="form-control px-4 pr-12 py-3 text-[20px] font-bold outline-none" step="0.01" min="34" max="42" inputmode="decimal" autocomplete="off" value="${r.temperature || ''}" placeholder="36.50" required>
+              <input type="number" id="form-temp" class="form-control px-5 pr-14 py-4 text-[28px] font-serif font-semibold tracking-[-0.03em] outline-none" step="0.01" min="34" max="42" inputmode="decimal" autocomplete="off" value="${r.temperature || ''}" placeholder="36.50" required>
               <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-sub">°C</span>
             </div>
             <p class="field-hint">小数点以下2桁まで入力できます（34.00〜42.00°C）</p>
@@ -1952,7 +2000,7 @@ ${pastDataText}
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().clinic.find(x => x.id === id) || {};
         return `
-          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+          <div class="mb-6 p-5 rounded-[24px] bg-wellness-blue-light/70">
             <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">CLINIC VISIT</p>
             <p class="text-sm text-main leading-relaxed">受診日と、病院から案内された次回予定を記録します。</p>
           </div>
@@ -1990,7 +2038,7 @@ ${pastDataText}
         const eventLabel = isTiming ? 'タイミング' : 'IUI';
         
         return `
-          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+          <div class="mb-6 p-5 rounded-[24px] bg-sage-light/70">
             <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">${isTiming ? 'TIMING' : 'IUI EVENT'}</p>
             <p class="text-sm text-main leading-relaxed">${eventLabel}の予定と実施状況をまとめて管理します。</p>
           </div>
@@ -2025,7 +2073,7 @@ ${pastDataText}
         const d = defaultDate || Utils.getTodayStr();
         const r = Store.get().cycles.find(x => x.id === id) || {};
         return `
-          <div class="mb-5 p-4 rounded-2xl bg-white border border-border/80">
+          <div class="mb-6 p-5 rounded-[24px] bg-primary-light/65">
             <p class="text-[11px] font-bold tracking-[0.14em] text-sub mb-1">CYCLE</p>
             <p class="text-sm text-main leading-relaxed">生理開始日を基準に、予測とすべての記録を周期へ紐づけます。</p>
           </div>
