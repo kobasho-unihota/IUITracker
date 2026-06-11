@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Rhythm">
-  <meta name="theme-color" content="#071017">
+  <meta name="theme-color" content="#eef3f5">
   
   <!-- 新しいアイコン: Rhythmを表現するスマートな波形デザイン -->
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA1MTIgNTEyJz48cmVjdCB3aWR0aD0nNTEyJyBoZWlnaHQ9JzUxMicgcng9JzExMicgZmlsbD0nIzFlMjkzYicvPjxwYXRoIGQ9J00xMDAgMjU2IEwyMDAgMjU2IEwyNTAgMTU2IEwzMDAgMzU2IEwzNTAgMjU2IEw0MTIgMjU2JyBmaWxsPSdub25lJyBzdHJva2U9JyMzOGJkZjgnIHN0cm9rZS13aWR0aD0nMzInIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcgc3Ryb2tlLWxpbmVqb2luPSdyb3VuZCcvPjwvc3ZnPg==" type="image/svg+xml">
@@ -301,19 +301,19 @@
       theme: {
         extend: {
           colors: {
-            primary: '#2dd4bf',
-            'primary-light': '#153c3a',
-            bg: '#071017',
-            card: '#101b24',
-            main: '#f1f5f9',
-            sub: '#8fa2b2',
-            border: '#1d2b36',
-            sage: '#34d399',
-            'sage-light': '#12372f',
-            'wellness-blue': '#38bdf8',
-            'wellness-blue-light': '#102f43',
-            lilac: '#818cf8',
-            'lilac-light': '#272b52'
+            primary: '#0f8f86',
+            'primary-light': '#dff4f1',
+            bg: '#eef3f5',
+            card: '#ffffff',
+            main: '#14202b',
+            sub: '#657684',
+            border: '#d8e2e7',
+            sage: '#16856f',
+            'sage-light': '#e3f3ee',
+            'wellness-blue': '#367da6',
+            'wellness-blue-light': '#e4f0f6',
+            lilac: '#5868b0',
+            'lilac-light': '#e8ebf7'
           },
           fontFamily: {
             sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Hiragino Sans"', '"Noto Sans JP"', 'sans-serif'],
@@ -326,17 +326,17 @@
   
   <style>
     :root {
-      color-scheme: dark;
-      --accent: #2dd4bf;
-      --accent-deep: #0f766e;
-      --indigo: #818cf8;
-      --emerald: #34d399;
-      --ink: #f1f5f9;
-      --muted: #8fa2b2;
-      --surface: rgba(16, 27, 36, 0.88);
-      --surface-strong: #101b24;
-      --line: rgba(143, 162, 178, 0.14);
-      --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+      color-scheme: light;
+      --accent: #0f8f86;
+      --accent-deep: #0b6f69;
+      --indigo: #5868b0;
+      --emerald: #16856f;
+      --ink: #14202b;
+      --muted: #657684;
+      --surface: rgba(255, 255, 255, 0.88);
+      --surface-strong: #ffffff;
+      --line: rgba(53, 76, 91, 0.12);
+      --shadow: 0 20px 55px rgba(40, 61, 74, 0.09);
     }
     *, *::before, *::after { box-sizing: border-box; }
     html {
@@ -344,7 +344,7 @@
       overflow-x: hidden;
       overscroll-behavior: none;
       touch-action: manipulation;
-      background: #071017;
+      background: #eef3f5;
       -webkit-tap-highlight-color: transparent;
     }
     body {
@@ -353,9 +353,9 @@
       overscroll-behavior-y: none;
       color: var(--ink);
       background:
-        radial-gradient(circle at 12% -4%, rgba(45, 212, 191, 0.10), transparent 25rem),
-        radial-gradient(circle at 94% 20%, rgba(129, 140, 248, 0.09), transparent 27rem),
-        linear-gradient(180deg, #071017 0%, #09131b 52%, #071017 100%);
+        radial-gradient(circle at 12% -4%, rgba(15, 143, 134, 0.10), transparent 25rem),
+        radial-gradient(circle at 94% 20%, rgba(88, 104, 176, 0.08), transparent 27rem),
+        linear-gradient(180deg, #f4f7f8 0%, #edf3f5 52%, #f7f9fa 100%);
       letter-spacing: -0.015em;
       -webkit-tap-highlight-color: transparent;
     }
@@ -381,7 +381,7 @@
     body:has(.bottom-sheet.open) #app-content,
     body:has(.bottom-sheet.open) nav {
       transform: scale(.955) translateY(-10px);
-      filter: brightness(.58) saturate(.7);
+      filter: brightness(.76) saturate(.75);
       border-radius: 24px;
     }
     .fade-in { animation: fadeIn 0.38s cubic-bezier(.22,1,.36,1) forwards; }
@@ -399,25 +399,25 @@
       transform-origin: 50% 8%;
     }
     .card-soft, .data-panel {
-      background: linear-gradient(145deg, rgba(18, 31, 41, .96), rgba(12, 23, 31, .9));
+      background: linear-gradient(145deg, rgba(255, 255, 255, .97), rgba(247, 250, 251, .94));
       border: 1px solid var(--line);
       box-shadow: var(--shadow);
       backdrop-filter: blur(24px) saturate(1.08);
     }
     .hero-card {
       background:
-        radial-gradient(circle at 82% 5%, rgba(45, 212, 191, .17), transparent 16rem),
-        radial-gradient(circle at 10% 100%, rgba(129, 140, 248, .12), transparent 14rem),
-        linear-gradient(145deg, #101e28 0%, #0d1821 100%);
-      border: 1px solid rgba(94, 234, 212, .12);
+        radial-gradient(circle at 82% 5%, rgba(15, 143, 134, .16), transparent 16rem),
+        radial-gradient(circle at 10% 100%, rgba(88, 104, 176, .10), transparent 14rem),
+        linear-gradient(145deg, #f7fbfb 0%, #edf5f5 100%);
+      border: 1px solid rgba(15, 143, 134, .14);
       color: var(--ink);
-      box-shadow: 0 30px 80px rgba(0, 0, 0, .38);
+      box-shadow: 0 24px 60px rgba(38, 70, 78, .12);
     }
     .nav-shell {
       max-width: 630px;
       margin: 0 auto 10px;
       border-radius: 22px;
-      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+      box-shadow: 0 16px 45px rgba(40, 61, 74, 0.15);
       transition: transform .46s cubic-bezier(.22,1,.36,1), filter .35s ease;
     }
     .nav-btn {
@@ -427,7 +427,7 @@
     }
     .nav-btn svg { width: 20px; height: 20px; stroke-width: 1.75; }
     .nav-btn.text-primary {
-      background: rgba(45, 212, 191, 0.12);
+      background: rgba(15, 143, 134, 0.11);
       color: var(--accent);
       font-weight: 800;
     }
@@ -435,14 +435,14 @@
       width: 56px;
       height: 56px;
       margin-top: -20px;
-      border: 5px solid #071017;
+      border: 5px solid #eef3f5;
       border-radius: 18px;
-      background: linear-gradient(145deg, #5eead4, #0f9f91);
-      color: #04100f;
-      box-shadow: 0 14px 34px rgba(45, 212, 191, 0.26);
+      background: linear-gradient(145deg, #20aaa0, #0b746d);
+      color: #fff;
+      box-shadow: 0 14px 34px rgba(15, 143, 134, 0.24);
     }
     .eyebrow {
-      color: #5eead4;
+      color: #0b7d75;
       font-size: 0.72rem;
       font-weight: 800;
       letter-spacing: 0.12em;
@@ -467,33 +467,33 @@
     }
     .forecast-card {
       border: 1px solid var(--line);
-      background: rgba(16, 27, 36, 0.78);
+      background: rgba(255, 255, 255, 0.86);
       box-shadow: var(--shadow);
     }
     .btn-primary {
-      background: linear-gradient(135deg, #5eead4, #20b8a7);
-      color: #04100f;
-      box-shadow: 0 12px 30px rgba(45, 212, 191, 0.20);
+      background: linear-gradient(135deg, #149c92, #0b756e);
+      color: #fff;
+      box-shadow: 0 12px 28px rgba(15, 143, 134, 0.20);
       transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
     }
     .btn-primary:active { transform: scale(0.985); }
     .btn-primary:disabled { opacity: 0.62; cursor: wait; box-shadow: none; }
-    .field-label { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.55rem; font-size: 0.78rem; font-weight: 700; color: #a8bac7; letter-spacing: .03em; }
+    .field-label { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.55rem; font-size: 0.78rem; font-weight: 700; color: #516674; letter-spacing: .03em; }
     .field-required { color: var(--accent); font-size: 0.64rem; font-weight: 800; }
     .field-hint { margin-top: 0.5rem; font-size: 0.72rem; line-height: 1.6; color: var(--muted); }
     .form-control {
       min-height: 54px;
-      color: #f8fafc !important;
+      color: #14202b !important;
       border-radius: 15px !important;
-      border: 1px solid rgba(143, 162, 178, .18) !important;
-      background: rgba(7, 16, 23, 0.72) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+      border: 1px solid rgba(53, 76, 91, .16) !important;
+      background: rgba(255, 255, 255, 0.88) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
       transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
     }
     .form-control:focus {
-      border-color: rgba(45, 212, 191, .66) !important;
-      box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.10);
-      background: #0b1720 !important;
+      border-color: rgba(15, 143, 134, .62) !important;
+      box-shadow: 0 0 0 4px rgba(15, 143, 134, 0.10);
+      background: #fff !important;
     }
     select.form-control {
       padding-right: 2.75rem !important;
@@ -504,16 +504,16 @@
     }
     .form-error {
       border: 1px solid rgba(251, 113, 133, 0.30);
-      background: rgba(76, 5, 25, 0.38);
-      color: #fda4af;
+      background: rgba(255, 241, 242, 0.94);
+      color: #be123c;
     }
-    .bg-rose-50 { background-color: rgba(244, 63, 94, .06) !important; }
-    .text-rose-500 { color: #fda4af !important; }
-    .border-rose-200 { border-color: rgba(253, 164, 175, .18) !important; }
+    .bg-rose-50 { background-color: rgba(255, 241, 242, .94) !important; }
+    .text-rose-500 { color: #be123c !important; }
+    .border-rose-200 { border-color: rgba(244, 63, 94, .18) !important; }
     #cal-detail-area .card-soft {
       width: 100%;
       border-radius: 17px;
-      background: rgba(255, 255, 255, .025);
+      background: rgba(20, 32, 43, .025);
       box-shadow: none;
     }
     #cal-detail-area .grid button {
@@ -522,11 +522,15 @@
       justify-content: center;
       gap: .4rem;
       min-height: 46px;
-      color: #a8bac7 !important;
-      border-color: rgba(143, 162, 178, .14) !important;
-      background: rgba(255, 255, 255, .035) !important;
+      color: #516674 !important;
+      border-color: rgba(53, 76, 91, .14) !important;
+      background: rgba(20, 32, 43, .035) !important;
     }
     #cal-detail-area .grid button svg { width: 15px; height: 15px; color: var(--accent); }
+    [class*="bg-white/"] { background-color: rgba(20, 32, 43, .035) !important; }
+    [class*="border-white/"] { border-color: rgba(53, 76, 91, .12) !important; }
+    [class*="divide-white/"] > :not([hidden]) ~ :not([hidden]) { border-color: rgba(53, 76, 91, .10) !important; }
+    .placeholder\:text-white\/15::placeholder { color: rgba(20, 32, 43, .2) !important; }
     button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
       outline: 3px solid rgba(45, 212, 191, 0.22);
       outline-offset: 2px;
@@ -550,7 +554,7 @@
 </head>
 <body class="text-main font-sans antialiased overflow-x-hidden selection:bg-primary-light selection:text-main">
 
-  <div id="global-loading" class="fixed inset-0 bg-[#071017]/95 backdrop-blur-xl z-[100] flex flex-col items-center justify-center fade-in" role="status" aria-live="polite">
+  <div id="global-loading" class="fixed inset-0 bg-[#eef3f5]/95 backdrop-blur-xl z-[100] flex flex-col items-center justify-center fade-in" role="status" aria-live="polite">
     <div class="relative h-14 w-14 mb-5">
       <div class="absolute inset-0 rounded-full border border-primary/20"></div>
       <div class="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-primary border-r-primary/40"></div>
@@ -559,21 +563,21 @@
     <button id="global-loading-cancel" onclick="API.cancelAnalysis()" class="hidden mt-5 px-5 py-2.5 rounded-xl border border-border bg-card text-sm font-bold text-main">キャンセル</button>
   </div>
 
-  <div id="toast" class="fixed padding-safe-toast left-1/2 -translate-x-1/2 bg-[#13232d]/95 backdrop-blur-xl text-white px-5 py-3 rounded-xl border border-white/10 text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-2xl max-w-[calc(100vw-32px)] text-center" role="status" aria-live="polite"></div>
+  <div id="toast" class="fixed padding-safe-toast left-1/2 -translate-x-1/2 bg-[#18303a]/95 backdrop-blur-xl text-white px-5 py-3 rounded-xl border border-black/5 text-sm font-medium z-[110] transition-opacity duration-300 opacity-0 pointer-events-none shadow-2xl max-w-[calc(100vw-32px)] text-center" role="status" aria-live="polite"></div>
 
   <main id="app-content" class="app-shell w-full min-h-screen px-5 sm:px-7 pt-7 sm:pt-10 padding-safe-nav hidden fade-in"></main>
 
   <div id="modal-overlay" class="fixed inset-0 bg-black/65 backdrop-blur-[10px] z-40 hidden transition-opacity duration-300 opacity-0" onclick="App.closeModal()"></div>
-  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-2.5 sm:inset-x-5 bottom-2 sm:bottom-5 z-50 bg-[#0d1922]/96 backdrop-blur-2xl rounded-[22px] shadow-[0_30px_100px_rgba(0,0,0,0.58)] max-h-[91vh] flex flex-col max-w-[690px] mx-auto overflow-x-hidden box-border border border-white/10" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true" inert>
-    <div class="w-10 h-1 rounded-full bg-white/15 mx-auto mt-3 shrink-0" aria-hidden="true"></div>
-    <div class="sticky top-0 bg-[#0d1922]/88 backdrop-blur-2xl z-10 px-6 py-4 flex justify-between items-center shrink-0">
+  <div id="modal-sheet" class="bottom-sheet closed fixed inset-x-2.5 sm:inset-x-5 bottom-2 sm:bottom-5 z-50 bg-white/96 backdrop-blur-2xl rounded-[22px] shadow-[0_30px_100px_rgba(40,61,74,0.22)] max-h-[91vh] flex flex-col max-w-[690px] mx-auto overflow-x-hidden box-border border border-black/[.06]" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true" inert>
+    <div class="w-10 h-1 rounded-full bg-black/10 mx-auto mt-3 shrink-0" aria-hidden="true"></div>
+    <div class="sticky top-0 bg-white/88 backdrop-blur-2xl z-10 px-6 py-4 flex justify-between items-center shrink-0">
       <h3 id="modal-title" class="text-[19px] tracking-tight font-bold">タイトル</h3>
-      <button onclick="App.closeModal()" class="text-sub bg-white/[.06] rounded-xl w-10 h-10 flex items-center justify-center border border-white/[.06]" aria-label="閉じる"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <button onclick="App.closeModal()" class="text-sub bg-black/[.035] rounded-xl w-10 h-10 flex items-center justify-center border border-black/[.05]" aria-label="閉じる"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div id="modal-body" class="px-5 sm:px-6 pt-2 flex-1 overflow-y-auto no-scrollbar padding-safe-modal"></div>
   </div>
 
-  <nav class="nav-shell fixed bottom-0 inset-x-3 bg-[#0d1922]/88 backdrop-blur-2xl border border-white/[.08] z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+  <nav class="nav-shell fixed bottom-0 inset-x-3 bg-white/88 backdrop-blur-2xl border border-black/[.06] z-30" aria-label="メインナビゲーション" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
     <div class="flex justify-around items-center h-[72px] px-2.5 gap-1" id="nav-container">
       <button onclick="App.navigate('home')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="home" aria-label="今日"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></svg>今日</button>
       <button onclick="App.navigate('calendar')" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[11px] text-sub transition-all duration-200" data-target="calendar" aria-label="カレンダー"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z"/></svg>予定</button>
@@ -1193,7 +1197,7 @@ ${pastDataText}
           <select class="form-control px-4 py-3 text-sm mb-5" onchange="App.changeRecordsCycle(this.value)">${[...cycles].sort((a,b)=>String(b.start_date).localeCompare(String(a.start_date))).map(c=>`<option value="${c.id}" ${c.id===cycleId?'selected':''}>${Utils.toLocalYYYYMMDD(c.start_date).replace(/-/g,'/')} · ${Utils.escapeHtml(c.type||'周期')}</option>`).join('')}</select>
           ${cycle ? `<section class="data-panel rounded-[20px] p-5 mb-5"><div class="flex items-center justify-between mb-5"><div><p class="eyebrow">TEMPERATURE TREND</p><p class="text-xs text-sub mt-2">${start.replace(/-/g,'/')} から</p></div><div class="text-right"><p class="text-2xl font-semibold">${avg ? avg.toFixed(2) : '--'}<span class="text-xs text-sub ml-1">°C AVG</span></p></div></div><div class="h-[230px] relative"><canvas id="tempChart"></canvas><div id="tempChart-empty" class="${chartData.length ? 'hidden' : ''} absolute inset-0 flex items-center justify-center text-sm text-sub">グラフに表示する体温記録がありません</div></div><div class="grid grid-cols-3 gap-2 mt-5"><div class="bg-white/[.035] rounded-[13px] p-3"><p class="text-[9px] text-sub">RECORDS</p><p class="text-lg font-bold mt-1">${chartData.length}</p></div><div class="bg-white/[.035] rounded-[13px] p-3"><p class="text-[9px] text-sub">MIN</p><p class="text-lg font-bold mt-1">${chartData.length?Math.min(...chartData.map(x=>x.value)).toFixed(2):'--'}</p></div><div class="bg-white/[.035] rounded-[13px] p-3"><p class="text-[9px] text-sub">MAX</p><p class="text-lg font-bold mt-1">${chartData.length?Math.max(...chartData.map(x=>x.value)).toFixed(2):'--'}</p></div></div></section>
           <section class="data-panel rounded-[20px] p-5 mb-7"><div class="flex items-center justify-between mb-4"><div><p class="eyebrow">AI INSIGHT</p><h2 class="font-bold mt-2">${pred?'分析結果':'分析を開始'}</h2></div><svg class="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="m12 3 1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7L12 3Z"/></svg></div>${pred?`<p class="text-sm text-sub leading-6 mb-4">${Utils.escapeHtml(pred.reason||'保存済みデータから予測しています')}</p>`:''}<textarea id="ai-memo-input-record" rows="2" class="form-control px-4 py-3 text-sm mb-3" placeholder="分析に加える補足" onchange="App.updateAiMemo('${cycleId}', this.value)">${Utils.escapeHtml(memo)}</textarea><button onclick="API.analyzeWithAI('${cycleId}')" class="w-full py-3.5 rounded-[13px] bg-indigo-400/10 border border-indigo-300/20 text-indigo-200 text-sm font-bold">${pred?'再分析する':'AI分析を実行'}</button></section>
-          <section><div class="flex items-center justify-between mb-5"><p class="eyebrow">TIMELINE</p><span class="text-xs text-sub">${timeline.length} records</span></div><div class="relative pl-10 before:absolute before:left-[13px] before:top-3 before:bottom-3 before:w-px before:bg-white/10">${timeline.length?timeline.map(item=>`<article class="relative pb-7"><span class="absolute -left-10 top-0 w-7 h-7 rounded-[10px] border border-white/10 bg-[#101b24] flex items-center justify-center">${item.type==='temp'?'<svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0Z"/></svg>':item.type==='clinic'?'<svg class="w-3.5 h-3.5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M4 7h16v13H4V7Zm4 0V4h8v3"/></svg>':'<svg class="w-3.5 h-3.5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M6 3v3m12-3v3M4 9h16M5 5h14v15H4V5Z"/></svg>'}</span><div class="data-panel rounded-[17px] p-4"><div class="flex items-center justify-between"><div><p class="text-xs text-sub">${Utils.toLocalYYYYMMDD(item.date).replace(/-/g,'.')}</p><p class="text-sm font-bold mt-1">${item.title}</p></div><p class="text-sm font-semibold">${item.value}</p></div></div></article>`).join(''):'<div class="data-panel rounded-[17px] p-6 text-sm text-sub">この周期の記録はまだありません</div>'}</div></section>` : `<section class="data-panel rounded-[20px] p-7 text-center text-sub">表示する周期を登録してください</section>`}`;
+          <section><div class="flex items-center justify-between mb-5"><p class="eyebrow">TIMELINE</p><span class="text-xs text-sub">${timeline.length} records</span></div><div class="relative pl-10 before:absolute before:left-[13px] before:top-3 before:bottom-3 before:w-px before:bg-white/10">${timeline.length?timeline.map(item=>`<article class="relative pb-7"><span class="absolute -left-10 top-0 w-7 h-7 rounded-[10px] border border-white/10 bg-white flex items-center justify-center shadow-sm">${item.type==='temp'?'<svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0Z"/></svg>':item.type==='clinic'?'<svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M4 7h16v13H4V7Zm4 0V4h8v3"/></svg>':'<svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M6 3v3m12-3v3M4 9h16M5 5h14v15H4V5Z"/></svg>'}</span><div class="data-panel rounded-[17px] p-4"><div class="flex items-center justify-between"><div><p class="text-xs text-sub">${Utils.toLocalYYYYMMDD(item.date).replace(/-/g,'.')}</p><p class="text-sm font-bold mt-1">${item.title}</p></div><p class="text-sm font-semibold">${item.value}</p></div></div></article>`).join(''):'<div class="data-panel rounded-[17px] p-6 text-sm text-sub">この周期の記録はまだありません</div>'}</div></section>` : `<section class="data-panel rounded-[20px] p-7 text-center text-sub">表示する周期を登録してください</section>`}`;
       },
 
       cycles: () => {
